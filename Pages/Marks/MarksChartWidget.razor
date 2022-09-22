@@ -1,0 +1,161 @@
+﻿@inject Context _context
+@inject AuthenticationStateProvider authStateProvider
+
+<div class="col-lg-6">
+    <div class="card">
+        <div class="card-body">
+
+            <p><h3>Мои оценки</h3></p>
+
+            <p>
+                <h5>
+                    <i class="fas fa-angle-left" @onclick="(()=>datetime_change(-1))"></i>
+                        <font color="black"><b>@viewdata_datetime</b></font>
+                    <i class="fas fa-angle-right" @onclick="(()=>datetime_change(1))"></i>
+                </h5>
+            </p>
+
+            @if (Mark.isTwoMarks)
+            {
+                 <p><h2 @onclick="mark_show"><font color="red">@Mark.first_mark</font></h2></p>
+            }
+            else
+            {
+                 <p><h2 @onclick="mark_show"><font color="red">@Mark.first_mark / @Mark.second_mark</font></h2></p>
+            }
+           
+        </div>
+    </div>
+</div>
+
+
+@code {
+
+
+    int pos_num = 0;
+    schema_users user_model = new();
+    List<schema_marks> Marks = new();
+
+    schema_marks Mark = new();
+
+    string viewdata_datetime = "Пн, 11.09.2022";
+    DateTime viewdata_dt = new DateTime(2022, 09, 11);
+
+    bool isAdmin = false;
+
+    string user_ { get; set; }
+
+    protected override void OnInitialized()
+    {
+
+        user_ = authStateProvider.GetAuthenticationStateAsync().Result.User.Identity.Name;
+
+        //Получаем карточку пользователя
+
+        if (user_ != null)
+        {
+            user_model = _context.User_Get(user_);
+
+            //Проверка админки
+            if (user_model.role == "admin"
+                || user_model.role == "owner"
+                || user_model.role == "secretary")
+            {
+                isAdmin = true;
+            }
+            else
+            {
+                isAdmin = false;
+            }
+        }
+
+        Marks = _context.Marks_Get(user_model.id.ToString());
+
+        if (Marks != null)
+        {
+            if (Marks.Count > 0)
+            {
+                Marks = Marks.OrderByDescending(p => p.date).ToList();
+                pos_num = Marks.Count / 2;
+                Mark = Marks[Marks.Count / 2];
+                viewdata_dt = Marks[Marks.Count / 2].date;
+                viewdata_datetime = getViewDataByDateTime();
+            }
+
+
+        }
+
+
+
+    }
+
+    public void datetime_change(int i)
+    {
+        if (i > 0)
+        {
+            if (i < Marks.Count)
+            {
+                pos_num++;
+            }
+        }
+        else if (i< 0)
+        {
+            if (i > 0)
+            {
+                pos_num--;
+            }
+        }
+
+        if (pos_num > 0 && pos_num < Marks.Count)
+        {
+            Mark = Marks[pos_num];
+        }
+        StateHasChanged();
+    }
+
+    void mark_show()
+    {
+        
+    }
+
+    public string getViewDataByDateTime()
+    {
+        string viewd = "";
+
+        switch(viewdata_dt.DayOfWeek)
+        {
+            case DayOfWeek.Monday:
+                viewd += "Пн, ";
+                break;
+
+            case DayOfWeek.Tuesday:
+                viewd += "Вт, ";
+                break;
+
+            case DayOfWeek.Wednesday:
+                viewd += "Ср, ";
+                break;
+
+            case DayOfWeek.Thursday:
+                viewd += "Чт, ";
+                break;
+
+            case DayOfWeek.Friday:
+                viewd += "Пт, ";
+                break;
+
+            case DayOfWeek.Saturday:
+                viewd += "Сб, ";
+                break;
+
+            default:
+                viewd += "Вс, ";
+                break;
+        }
+
+        viewd += viewdata_dt.ToShortDateString();
+
+        return viewd;
+    }
+
+}

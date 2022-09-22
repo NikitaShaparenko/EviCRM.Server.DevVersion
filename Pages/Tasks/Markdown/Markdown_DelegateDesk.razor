@@ -1,0 +1,180 @@
+﻿@using System.ComponentModel.DataAnnotations
+@using EviCRM.Server.Pages.Secretary
+<!doctype html>
+
+<PageTitle>Markdown - Делегирование доски</PageTitle>
+
+<html>
+<head>
+    <meta charset="utf-8">
+
+</head>
+
+<style>
+
+      .action_menu2 {
+        position: absolute;
+        right: 5px;
+        bottom: 5px;
+    }
+
+     .action_menu {
+        position: absolute;
+        right: 65px;
+        bottom: 5px;
+    }
+
+    .btn-circle {
+        width: 50px;
+        height: 50px;
+        border-radius: 35px;
+        text-align: center;
+        padding-left: 0;
+        padding-right: 0;
+        font-size: 16px;
+        white-space: normal; /* восстанавливаем свойству значение по умолчанию */
+    }
+</style>
+
+<body>
+    @if (ready)
+    {
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title mb-4">Делегировать доску</h3>
+
+                    <h5>Выбрана доска для делегирования: @Desk.markdown_desk_name</h5>
+
+                         <div class="form-group row mb-4">
+                           
+                            <div class="col-lg-10">
+                                <label class="col-form-label">Кому:</label>
+                            </div>
+
+                            <div class="col-lg-10">
+                               <Havit.Blazor.Components.Web.Bootstrap.HxSelect 
+                                Label="Список пользователей"
+                                                                            TItem="@SelectData"
+                                                                            TValue="string"
+                                                                            Data="@select_data_users"
+                                                                            @bind-Value="@SelectedValues_personal"
+                                                                            TextSelector="@((p) => p.Name)"
+                                                                            ValueSelector="@((p) => p.Id)"
+                                                                            NullDataText="Загружаются значения..." />
+                            </div>
+                        </div>
+
+                     <div class="action_menu">
+                        <button type="button" @onclick="SaveCard" class="btn btn-success btn-circle"><i class="mdi mdi-check"></i></button>
+                    </div>
+                     <div class="action_menu2">
+                        <button type="button" @onclick="ExitCard" class="btn btn-danger btn-circle"><i class="mdi mdi-close"></i></button>
+                    </div>
+
+
+                </div>
+            </div>
+        </div>
+    </div>
+    }
+
+</body>
+</html>
+
+@code{
+    [Parameter]
+    public int desk_num_id { get; set;}
+
+    [Parameter]
+    public string desk_name { get; set; }
+
+    [Parameter]
+    public EventCallback<string> ErrorShow {get;set;}
+
+    [Parameter]
+    public List<schema_users> Users { get; set; }
+
+    [Parameter]
+    public schema_markdown_desks Desk { get; set; }
+
+    [Parameter]
+    public schema_users Current_User { get; set; }
+
+    IList<SelectData> select_data_users = new List<SelectData>();
+
+    bool ready = false;
+    string SelectedValues_personal = "-1";
+}
+
+@code{
+    protected override void OnInitialized()
+    {
+        ready = false;
+        if (Users != null)
+        {
+            if (Users.Count > 0)
+            {
+                select_data_users = new List<SelectData>();
+
+                SelectData sd = new();
+                sd.Id = "-1";
+                sd.Name = "Всем пользователям";
+                select_data_users.Add(sd);
+
+                foreach(var elem in Users)
+                {
+                    //if (elem != Current_User)
+                    if (true)
+                    {
+                        SelectData sd2 = new();
+                        sd2.Id = elem.id.ToString();
+                        sd2.Name = elem.fullname;
+                        select_data_users.Add(sd2);
+                    }
+                }
+            }
+        }
+        ready = true;
+        StateHasChanged();
+    }
+
+    public void SaveCard()
+    {
+        if (SelectedValues_personal == "" || SelectedValues_personal == null)
+        {
+            ErrorShow.InvokeAsync("Надо выбрать кому делегировать доску!");
+            return;
+        }
+
+        if (int.TryParse(SelectedValues_personal,out int a))
+        {
+            Desk.markdown_desk_personal_id = a;
+            Markdown_TwoWayDesksBindings mdtib = new();
+            mdtib.desk_num = desk_num_id;
+            mdtib.Desk = Desk;
+            OnSave.InvokeAsync(mdtib);
+        }
+        else
+        {
+            return;
+        }
+
+        
+    }
+
+    public void ExitCard()
+    {
+        OnExit.InvokeAsync(desk_num_id);
+    }
+    }
+
+
+@code{
+    [Parameter]
+    public EventCallback<Markdown_TwoWayDesksBindings> OnSave { get; set; }
+
+     [Parameter]
+    public EventCallback<int> OnExit { get; set; }
+}

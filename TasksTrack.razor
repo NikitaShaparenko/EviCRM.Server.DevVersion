@@ -1,0 +1,1718 @@
+﻿@page "/task_tracking"
+
+@using EviCRM.Server.Core
+@using System.Collections.Generic;
+@using System.Net
+@using EviCRM.Server.ViewModels
+@using System.Net.Sockets
+@using System.Globalization
+@using EviCRM.Server.Pages.Tasks;
+@using Majorsoft.Blazor.Extensions.BrowserStorage
+@using System.Web.Mvc
+
+@inject NavigationManager UriHelper
+@inject ILocalStorageService localStorage
+
+<h5>Задачи \ Списком</h5>
+
+<!-- Ошибка загрузки задачи -->
+
+if (task_id_cookie == null || task_id_cookie == "")
+    {
+        <div class="col-lg-4">
+        <div class="card border border-danger">
+            <div class="card-header bg-transparent border-danger">
+                <h5 class="my-0 text-danger"><i class="mdi mdi-block-helper me-3"></i>Не удаётся загрузить текущую задачу</h5>
+            </div>
+            <div class="card-body">
+                <h5 class="card-title">Мне не показать вам страницу, так как я не понимаю к какой задаче она относится</h5>
+                  <p>Я бы на самом на самом деле с радостью вам её показал, но я не получил достоверных данных какую именно задачу показать</p>
+        <p></p>
+        <p><b>Это может быть следствием:</b></p>
+        <ul>
+        <li>Чьей-то злой шутки</li>
+        <li>Технической ошибки программиста</li>
+        <li>Отключены Cookie в браузере, для текущего сайта они очень нужны</li>
+        </ul>
+
+        <p>В любом случае, если вы читаете это сообщение, то свяжитесь с разработчиком: <a target="_blank" href="https://t.me/nikita4shap" class="btn btn-primary btn-lg waves-effect waves-light">Написать</a> </p>
+            </div>
+        </div>
+    </div>
+
+        }
+
+
+
+if (task_id_cookie != null && task_id_cookie != "" && ready)
+{
+<div class="row">
+
+    <!--Панель управления-->
+
+     <div class="col-lg-4">
+        <div class="card bg-primary text-white-50">
+            <div class="card-body">
+
+                <h5 class="mb-4 text-white"><i class="mdi mdi-bullseye-arrow me-3"></i>Основные сведения</h5>
+                @if (tasks_author_dt.Count > 0)
+                {
+                <p class="card-text text-white"><h5 style="color:white"><i class="bx bx-male"></i>Автор задачи: @(async () => await mysqlc.MySql_ContextAsyncGeneral(mysqlc.getUsernameByLogin(@tasks_author_dt[0])))</h5></p>                    
+                }
+                @if (tasks_proj_dt.Count > 0)
+                {
+                    <p class="card-text text-white"><h5 style="color:white"><i class="bx bx-card"></i>Проекты связанные с задачей: </h5></p>
+                    <ul>
+                    @foreach(string strc in bc.getMultipleStringDecodingString(@tasks_proj_dt[0]))
+                    {
+                            <li><p class="card-text text-white"><h5 style="color:white"><i class="bx bx-card"> @(async () => await mysqlc.MySql_ContextAsyncGeneral(mysqlc.getProjectsNameByID(strc)))</i></h5></p></li>
+                    }
+                    </ul>
+                }
+                @if (tasks_start_dt.Count > 0)
+                {
+                    <p class="card-text text-white"><h5 style="color:white"><i class="bx bx-calendar-event"></i>Дата начала: @tasks_start_dt[0] </h5></p>
+                }
+                @if (tasks_end_dt.Count > 0)
+                {
+                <p class="card-text text-white"><h5 style="color:white"><i class="bx bx-check-square"></i>Дата окочания: @tasks_end_dt[0]</h5></p>
+                }
+               @if (isAdmin)
+                {
+                     <div class="d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-secondary waves-effect waves-light">Изменить</button>
+                    <button type="button" class="btn btn-success waves-effect waves-light">Досрочно закрыть</button>
+                    <button type="button" class="btn btn-info waves-effect waves-light"  data-bs-toggle="modal" data-bs-target="#top_remind">Напомнить</button>
+                    <!--<button type="button" class="btn btn-warning waves-effect waves-light">Предупреждение</button>-->
+                    <button type="button" class="btn btn-danger waves-effect waves-light" data-bs-toggle="modal" data-bs-target="#top_fail">Закрыть как провал</button>
+                    <button type="button" class="btn btn-secondary waves-effect waves-light" data-bs-toggle="modal" data-bs-target="#top_revision">Вернуть на доработку</button>
+
+                    <!-- sample modal content -->
+                </div>
+                }
+               
+                
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Карта целей а-ля Трелло -->
+
+     <div class="col-lg-4">
+        <div class="card bg-info text-white-50">
+            <div class="card-body">
+                <h5 class="mb-4 text-white"><i class="mdi mdi-alert-circle-outline me-3"></i>Карта целей</h5>
+                <p class="card-text">Здесь отражены важные промежуточные точки задачи</p>
+
+        @for(int i = 0; i<card_marksdown.Count; i++)
+        {
+            if (card_marksdown[i] == "checked")
+            {
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" id="ttm_cardmark_selected" name="ttm_cardmark_selected" asp-for="ttm_cardmark_selected" />
+                    <label class="form-check-label" for="flexSwitchCheckDefault">@card_body[i]</label>
+                </div>
+            }
+            else
+            {
+                <div class="form-check form-switch">
+                     <input class="form-check-input" type="checkbox" id="ttm_cardmark_selected" name="ttm_cardmark_selected" asp-for="ttm_cardmark_selected" checked disabled>
+                     <label class="form-check-label" for="flexSwitchCheckCheckedDisabled">@card_body[i]</label>
+                </div>
+            }
+        <button type="submit" class="btn btn-success waves-effect waves-light">Подтвердить изменения</button>
+        }
+             </div>
+        </div>
+    </div>
+
+      <!-- Навбар пользователей -->
+
+    <div class="col-lg-4">
+        <div class="card border border-primary">
+            <div class="card-header bg-transparent border-primary">
+                <h5 class="my-0 text-primary"><i class="mdi mdi-bullseye-arrow me-3"></i>Состав участников задачи</h5>
+            </div>
+            <div class="card-body">
+                <h5 class="card-title">Отделы</h5>
+                @{
+                    if (task_id_cookie != null && task_id_cookie != "" && ready)
+                    {
+                    string dlist = tasks_members_dt[0];
+                    List<string> division_list = new List<string>();
+                    division_list = bc.getMultipleStringDecodingString(dlist);
+
+                    List<string> workers = new List<string>();
+                    List<string> divs = new List<string>();
+
+                    foreach(string str_dl in division_list)
+                    {
+                        if (users_dt.Contains(str_dl))
+                        {
+                            workers.Add(str_dl);
+                        }
+                        else
+                        {
+                            
+                            divs.Add(str_dl);                   
+                        
+                        }
+                    }
+                   
+                      @foreach (string strng in divs)
+                    {
+                         <p class="card-text"><i class="bx bx-face"></i> @(async () => await mysqlc.MySql_ContextAsyncGeneral(mysqlc.getDivisionNameByID(strng)))</p>
+                    }
+                   }
+                }
+                
+            </div>
+             <div class="card-body">
+                <h5 class="card-title">Отдельные пользователи</h5>
+                 @foreach (string strng in workers)
+                    {
+                         <p class="card-text"><i class="bx bx-face"></i> @(async () => await mysqlc.MySql_ContextAsyncGeneral(mysqlc.getUsernameByLogin(strng)))</p>
+                    }
+            </div>
+        </div>
+
+</div>
+}
+
+<!-- Доска напоминаний -->
+
+  <div id="top_remind" class="modal fade" tabindex="-1" aria-labelledby="#top_remind" aria-hidden="true">
+                        <div class="modal-dialog">
+
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="top_remind">Напомнить об актуальности задачи</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                                </div>
+                                <div class="modal-body">
+                                    
+
+             
+        <label>Напомнить об актуальности задачи</label>
+             
+         <select class="mult2-select inner form-control" asp-for="ttm_cmd_remind_whom" multiple="multiple" data-placeholder="Кому напомнить?">
+            <optgroup label="Управляющий состав">
+            <option value="ADMIN_GROUP_ALL">Всем</option>
+            <option value="ADMIN_GROUP_ALL_EXCEPT_ADMINS">Всем исполнителям</option>
+             </optgroup>
+            <optgroup label="Отделы">
+            <option value="Всем">Всем</option>
+            @for (int z = 0; z<divisions_ids.Count; z++)
+            {
+               <option value="@divisions_ids[z]">@divisions_name[z]</option>
+            }
+            </optgroup>
+            <optgroup label="Работники">
+            @for (int i = 0; i<users_dt.Count; i++)
+            {
+                <option value="@users_dt[i]">@fullname_dt[i]</option>
+            }
+            </optgroup>
+            </select>
+								</div>
+                                <div class="modal-footer">
+                                    <button type="submit" class="btn btn-primary waves-effect waves-light">Разослать напоминания</button>
+                                    <button type="button" class="btn btn-secondary waves-effect" data-bs-dismiss="modal">Закрыть</button>
+                                 </div>
+                              
+                            </div><!-- /.modal-content -->
+                        </div><!-- /.modal-dialog -->
+                    </div><!-- /.modal -->
+
+
+<!-- Модальное окно завершения задачи как провал -->
+
+
+                <div id="top_fail" class="modal fade" tabindex="-1" aria-labelledby="#top_fail" aria-hidden="true">
+                      
+                        <div class="modal-dialog modal-lg">
+
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="top_fail">Завершение задачи как провал</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="form-group row mb-4">
+
+             
+        <label>Вы собираетесь закрыть задачу как провальную</label>
+             
+        <label for="ttm_cmd_fail_body">Почему принято решение такое решение?</label>
+        <div class="col-lg-10">
+                <div id="ttm_cmd_fail_body" asp-for="ttm_cmd_fail_body" name="ttm_cmd_fail_body" class="taskdesc-editor-class-small">
+               
+                 </div>
+
+         </div>
+        
+        </div>
+                                </div>
+                                <div class="modal-footer">
+                                  @*  <button type="submit" class="btn btn-primary waves-effect waves-light">Закрыть задачу</button>
+                                  *@   <button type="button"  @onclick='(() => SendTOScriptCmd("FAIL"))' class="btn btn-primary waves-effect waves-light">Закрыть задачу</button>
+
+                                     <button type="button" class="btn btn-secondary waves-effect" data-bs-dismiss="modal">Закрыть</button>
+                                </div>
+                            </div><!-- /.modal-content -->
+                        </div><!-- /.modal-dialog -->
+                     @*    }*@
+                    </div><!-- /.modal -->
+
+<!-- Модальное окно напоминания  -->
+                    <div id="top_revision" class="modal fade" tabindex="-1" aria-labelledby="#top_revision" aria-hidden="true">
+                      
+                        <div class="modal-dialog">
+
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="top_revision">Завершение задачи</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="form-group row mb-4">
+
+             
+        <label>Вы собираетесь вернуть задачу на доработку</label>
+             
+        <label for="ttm_cmd_revision_body">Что нужно исправить?</label>
+        <div class="col-lg-10">
+                 @*<textarea name="ttm_commit_body" id="taskdesc-editor" asp-for="ttm_commit_body"></textarea>
+                  <textarea name="ttm_info_body" id="taskdesc-editor-infobody" asp-for="ttm_info_body"></textarea>*@
+                      <div id="ttm_cmd_revision_body" asp-for="ttm_cmd_revision_body" name="ttm_cmd_revision_body" class="taskdesc-editor-class-small">
+               
+                 </div>
+
+         </div>
+        </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary waves-effect" data-bs-dismiss="modal">Закрыть</button>
+                                    <button type="button"  @onclick='(() => SendTOScriptCmd("REVISION"))' class="btn btn-primary waves-effect waves-light">Вернуть на доработку</button>
+                                    @*<button type="submit" class="btn btn-primary waves-effect waves-light">Вернуть на доработку</button>*@
+                                </div>
+                            </div><!-- /.modal-content -->
+                        </div><!-- /.modal-dialog -->
+                    </div><!-- /.modal -->
+
+       
+</div>
+
+
+<!-- Горизонтальная карусель предварительных итогов-->
+
+<div class="row">
+    <div class="col-lg-12">
+        <div class="card">
+            <div class="card-body">
+                <h4 class="card-title mb-4">Резюме хода выполнения задач</h4>
+
+                @{
+                    string tasktracking_navs_carousel_title = "";
+                }
+
+                <div class="hori-timeline">
+                    <div class="owl-carousel owl-theme  navs-carousel events" id="timeline-carousel">
+                        
+                        @if (tasktracking_cmd.Count>0)
+                        {
+                             @if (tasktracking_cmd.Count>1)
+                             {
+                                @for (int i = 0; i<tasktracking_cmd.Count;i++)
+                                {
+                                    string toscript_cmd = tasktracking_cmd[i];
+
+                                    switch(toscript_cmd)
+                                    {
+                                        case "CREATE":
+                                                     <div class="item event-list">
+                            <div>
+                                <div class="event-date">
+                                    <div class="text-primary mb-1">@tasktracking_datetime[i]</div>
+                                    <h5 class="mb-4">Задача создана</h5>
+                                </div>
+                                <div class="event-down-icon">
+                                    <i class="bx bx-plus-medical h1 text-primary down-arrow-icon"></i>
+                                </div>
+
+                                <div class="mt-3 px-3">
+                                    <p class="text-muted">Первое событие в жизни любой задачи</p>
+                                </div>
+                            </div>
+                        </div>
+                                            break;
+                                        case "COMPLETE":
+                                        <div class="item event-list">
+                            <div>
+                                <div class="event-date">
+                                    <div class="text-primary mb-1">@tasktracking_datetime[i]</div>
+                                    <h5 class="mb-4">Задача завершена</h5>
+                                </div>
+                                <div class="event-down-icon">
+                                    <i class="bx bx-task h1 text-primary down-arrow-icon"></i>
+                                </div>
+
+                                <div class="mt-3 px-3">
+                                    <font color="green"><p class="text-muted">Задача завершена в срок</p></font>
+                                </div>
+                            </div>
+                        </div>
+
+                                            break;
+                                        case "COMPLETEBEFOREHAND":
+                                        <div class="item event-list">
+                            <div>
+                                <div class="event-date">
+                                    <div class="text-primary mb-1">@tasktracking_datetime[i]</div>
+                                    <h5 class="mb-4">Задача завершена</h5>
+                                </div>
+                                <div class="event-down-icon">
+                                    <i class="bx bx-task h1 text-primary down-arrow-icon"></i>
+                                </div>
+
+                                <div class="mt-3 px-3">
+                                    <font color="green"><p class="text-muted">Задача завершена заблаговременно</p></font>
+                                </div>
+                            </div>
+                        </div>
+                                            break;
+                                        case "COMPLETEDELAY":
+                                        <div class="item event-list">
+                            <div>
+                                <div class="event-date">
+                                    <div class="text-primary mb-1">@tasktracking_datetime[i]</div>
+                                    <h5 class="mb-4">Задача завершена</h5>
+                                </div>
+                                <div class="event-down-icon">
+                                    <i class="bx bx-task h1 text-primary down-arrow-icon"></i>
+                                </div>
+
+                                <div class="mt-3 px-3">
+                                    <font color="red"><p class="text-muted">Задача завершена с опозданием</p></font>
+                                </div>
+                            </div>
+                        </div>
+                                            break;
+                                        case "CANCELED":
+                                        <div class="item event-list">
+                            <div>
+                                <div class="event-date">
+                                    <div class="text-primary mb-1">@tasktracking_datetime[i]</div>
+                                    <h5 class="mb-4">Задача отменена</h5>
+                                </div>
+                                <div class="event-down-icon">
+                                    <i class="bx bx-bx-error-alt h1 text-primary down-arrow-icon"></i>
+                                </div>
+
+                                <div class="mt-3 px-3">
+                                    <p class="text-muted">По инициативе создателя\админа\владельца</p>
+                                </div>
+                            </div>
+                        </div>
+                                            break;
+                                        case "DELAY":
+                                          <div class="item event-list">
+                            <div>
+                                <div class="event-date">
+                                    <div class="text-primary mb-1">@tasktracking_datetime[i]</div>
+                                    <h5 class="mb-4">Запрошен перенос сроков</h5>
+                                </div>
+                                <div class="event-down-icon">
+                                    <i class="bx bx-timer h1 text-primary down-arrow-icon"></i>
+                                </div>
+                             
+                                        <h5><i>@tasktracking_datetime[i]</i></h5>
+                                        <p class="text-muted">@(async() => await mysqlc.MySql_ContextAsyncGeneral(mysqlc.getUsernameByLogin(tasktracking_author[i])))</p>
+
+                                <div class="mt-3 px-3">
+                                       @{
+                                            switch(tasktracking_var1[i])
+                                            {
+                                                case "OTHERTASK":
+                                                 <p class="text-muted">Ввиду других задач</p>
+                                                break;
+
+                                                case "LACKTIME":
+                                                 <p class="text-muted">Ввиду нехватки времени</p>
+                                                break;
+
+                                                case "FORCEM":
+                                                 <p class="text-muted">Ввиду форс-мажора</p>
+                                                break;
+
+                                                case "NOMONEY":
+                                                 <p class="text-muted">Ввиду нехватки финансирования</p>
+                                                break;
+
+                                                case "GUILTYMEMBER":
+                                                 <p class="text-muted">Ввиду вины другого исполнителя</p>
+                                                break;
+
+                                                case "OTHER":
+                                                 <p class="text-muted">Ввиду других причин</p>
+                                                break;
+                                            }
+                                            }
+                                 
+                                </div>
+                            </div>
+                        </div>
+                                            break;
+                                        case "NOSIR":
+                                          <div class="item event-list">
+                            <div>
+                                <div class="event-date">
+                                    <div class="text-primary mb-1">@tasktracking_datetime[i]</div>
+                                    <h5 class="mb-4">Исполнитель отказался</h5>
+                                </div>
+                                <div class="event-down-icon">
+                                    <i class="bx bxs-no-entry h1 text-primary down-arrow-icon"></i>
+                                </div>
+
+                                <div class="mt-3 px-3">
+                                    <p class="text-muted">Пользователь изначально отказался выполнять задачу</p>
+                                </div>
+                            </div>
+                        </div>
+                                            break;
+                                        case "PAUSE":
+                                        <div class="item event-list">
+                            <div>
+                                <div class="event-date">
+                                    <div class="text-primary mb-1">@tasktracking_datetime[i]</div>
+                                    <h5 class="mb-4">На паузе</h5>
+                                </div>
+                                <div class="event-down-icon">
+                                    <i class="bx bx-pause h1 text-primary down-arrow-icon"></i>
+                                </div>
+
+                                <div class="mt-3 px-3">
+                                    <p class="text-muted">Администратор\владелец\создатель задачи поставил её на паузу</p>
+                                </div>
+                            </div>
+                        </div>
+                                            break;
+                                        case "FAIL":
+                                        
+                                        <div class="item event-list">
+                            <div>
+                                <div class="event-date">
+                                    <div class="text-primary mb-1">@tasktracking_datetime[i]</div>
+                                    <h5 class="mb-4">Задача провалена</h5>
+                                </div>
+                                <div class="event-down-icon">
+                                    <i class="bx bx-error-circle h1 text-primary down-arrow-icon"></i>
+                                </div>
+
+                                <div class="mt-3 px-3">
+                                    <p class="text-muted">Администратор\владелец\создатель задачи посчитал её проваленой</p>
+                                    <p class="text-muted">@((MarkupString)@tasktracking_var1[i])</p>
+                                </div>
+                            </div>
+                        </div>
+                                            break;
+
+                                        default:
+                                            break;
+                                    }
+
+                            
+                        }
+                             }
+
+                           
+                        }
+                       
+
+                        
+
+                      
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- end card -->
+    </div>
+</div>
+
+
+
+<!-- Вертикальная карусель предварительных итогов -->
+
+<div class="row">
+    <div class="col-lg-12">
+        <div class="card">
+            <div class="card-body">
+                <h4 class="card-title mb-5">Хронология событий</h4>
+                <div class="">
+                    <ul class="verti-timeline list-unstyled">
+                        <!-- Один элемент -->
+                        
+                        <!---/////////////////////////////////////-->
+                        @if (tasktracking_cmd.Count>0)
+                        {
+                             @if (tasktracking_cmd.Count>1)
+                             {
+                                @for (int i = 0; i<tasktracking_cmd.Count;i++)
+                                {
+                                    string toscript_cmd = tasktracking_cmd[i];
+
+                                    switch(toscript_cmd)
+                                    {
+                                        case "CREATE":
+                                                     <li class="event-list">
+                            <div class="event-timeline-dot">
+                                <i class="bx bx-right-arrow-circle"></i>
+                            </div>
+                            <div class="d-flex">
+                                <div class="flex-shrink-0 me-3">
+                                    <i class="bx bx bxs-plus-square h2 text-primary"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div>
+                                        <h5>Задача создана</h5>
+                                       <h5><i>@tasktracking_datetime[i]</i></h5>
+                                        <p class="text-muted">@(async() => await mysqlc.MySql_ContextAsyncGeneral(mysqlc.getUsernameByLogin(tasktracking_author[i])))</p>
+
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+
+                                            break;
+                                        case "COMPLETE":
+                                      <li class="event-list">
+                            <div class="event-timeline-dot">
+                                <i class="bx bx-right-arrow-circle"></i>
+                            </div>
+                            <div class="d-flex">
+                                <div class="flex-shrink-0 me-3">
+                                    <i class="bx bx-task h2 text-primary"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div>
+                                        <h5>Задача заверешена в срок</h5>
+                                        <h5><i>@tasktracking_datetime[i]</i></h5>
+                                        <p class="text-muted">@(async() => await  mysqlc.MySql_ContextAsyncGeneral(mysqlc.getUsernameByLogin(tasktracking_author[i])))</p>
+
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+
+                                            break;
+                                        case "COMPLETEBEFOREHAND":
+                                         <li class="event-list">
+                            <div class="event-timeline-dot">
+                                <i class="bx bx-right-arrow-circle"></i>
+                            </div>
+                            <div class="d-flex">
+                                <div class="flex-shrink-0 me-3">
+                                    <i class="bx bx-task h2 text-primary"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div>
+                                        <h5>Задача заверешена заблаговременно</h5>
+                                        <h5><i>@tasktracking_datetime[i]</i></h5>
+                                        <p class="text-muted">@(async() => await mysqlc.MySql_ContextAsyncGeneral(mysqlc.getUsernameByLogin(tasktracking_author[i])))</p>
+
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                                            break;
+                                        case "COMPLETEDELAY":
+                                       <li class="event-list">
+                            <div class="event-timeline-dot">
+                                <i class="bx bx-right-arrow-circle"></i>
+                            </div>
+                            <div class="d-flex">
+                                <div class="flex-shrink-0 me-3">
+                                    <i class="bx bx-task h2 text-primary"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div>
+                                        <h5>Задача заверешена с задержкой</h5>
+                                        <h5><i>@tasktracking_datetime[i]</i></h5>
+                                        <p class="text-muted">@(async() => await mysqlc.MySql_ContextAsyncGeneral(mysqlc.getUsernameByLogin(tasktracking_author[i])))</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                                            break;
+                                        case "CANCELED":
+                                       <li class="event-list">
+                            <div class="event-timeline-dot">
+                                <i class="bx bx-right-arrow-circle"></i>
+                            </div>
+                            <div class="d-flex">
+                                <div class="flex-shrink-0 me-3">
+                                    <i class="bx bx-bx-error-alt h2 text-primary"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div>
+                                        <h5>Задача отменена</h5>
+                                        <h5><i>@tasktracking_datetime[i]</i></h5>
+                                        <p class="text-muted">@(async() => await mysqlc.MySql_ContextAsyncGeneral(mysqlc.getUsernameByLogin(tasktracking_author[i])))</p>
+
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                                            break;
+                                        case "DELAY":
+                                          <li class="event-list">
+                            <div class="event-timeline-dot">
+                                <i class="bx bx-right-arrow-circle"></i>
+                            </div>
+                            <div class="d-flex">
+                                <div class="flex-shrink-0 me-3">
+                                    <i class="bx bx-timer h2 text-primary"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div>
+                                        <h5>Задача отложена по срокам</h5>
+                                        @{
+                                            switch(tasktracking_var1[i])
+                                            {
+                                                case "OTHERTASK":
+                                                <h5>Ввиду других задач</h5>
+                                                break;
+
+                                                case "LACKTIME":
+                                                <h5>Ввиду нехватки времени</h5>
+                                                break;
+
+                                                case "FORCEM":
+                                                <h5>Ввиду форс-мажора</h5>
+                                                break;
+
+                                                case "NOMONEY":
+                                                <h5>Ввиду нехватки финансирования</h5>
+                                                break;
+
+                                                case "GUILTYMEMBER":
+                                                <h5>Ввиду вины другого исполнителя</h5>
+                                                break;
+
+                                                case "OTHER":
+                                                <h5>Ввиду других причин</h5>
+                                                break;
+                                            }
+                                            }
+                                        <h5><i>@tasktracking_datetime[i]</i></h5>
+                                        <p class="text-muted">@(async() => await mysqlc.MySql_ContextAsyncGeneral(mysqlc.getUsernameByLogin(tasktracking_author[i])))</p>
+
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                                            break;
+
+                                        case "NOSIR":
+                                            <li class="event-list">
+                            <div class="event-timeline-dot">
+                                <i class="bx bx-right-arrow-circle"></i>
+                            </div>
+                            <div class="d-flex">
+                                <div class="flex-shrink-0 me-3">
+                                    <i class="bx bxs-no-entry h2 text-primary"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div>
+                                        <h5>Пользователь отказался выполнять задачу</h5>
+                                        <h5><i>@tasktracking_datetime[i]</i></h5>
+                                        <p class="text-muted">@(async() => await mysqlc.MySql_ContextAsyncGeneral(mysqlc.getUsernameByLogin(tasktracking_author[i])))</p>
+
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                                            break;
+                                        case "PAUSE":
+                                          <li class="event-list">
+                            <div class="event-timeline-dot">
+                                <i class="bx bx-right-arrow-circle"></i>
+                            </div>
+                            <div class="d-flex">
+                                <div class="flex-shrink-0 me-3">
+                                    <i class="bx bx-timer h2 text-primary"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div>
+                                        <h5>Задачу поставили на паузу</h5>
+                                        <h5><i>@tasktracking_datetime[i]</i></h5>
+                                        <p class="text-muted">@(async() => await  mysqlc.MySql_ContextAsyncGeneral(mysqlc.getUsernameByLogin(tasktracking_author[i])))</p>
+
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                                            break;
+                                        case "FAIL":
+                                        
+                                          <li class="event-list">
+                            <div class="event-timeline-dot">
+                                <i class="bx bx-right-arrow-circle"></i>
+                            </div>
+                            <div class="d-flex">
+                                <div class="flex-shrink-0 me-3">
+                                    <i class="bx bx-error-circle h2 text-primary"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div>
+                                        <h5>Задача провалена</h5>
+                                        <h5><i>@tasktracking_datetime[i]</i></h5>
+                                        <p class="text-muted">@(async() => await  mysqlc.MySql_ContextAsyncGeneral(mysqlc.getUsernameByLogin(tasktracking_author[i])))</p>
+
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                                            break;
+
+
+                                            case "ADDMEMBER":
+
+                                            break;
+                                            case "KILLMEMBER":
+
+                                            break;
+                                            case "COMMIT":
+
+                                            <li class="event-list">
+                            <div class="event-timeline-dot">
+                                <i class="bx bx-right-arrow-circle"></i>
+                            </div>
+                            <div class="d-flex">
+                                <div class="flex-shrink-0 me-3">
+                                    <i class="bx bx-error-circle h2 text-primary"></i>
+                                </div>
+                                <div class="col-lg-4">
+        <div class="card bg-primary text-white-50">
+            <div class="card-body">
+                <h5 class="mb-4 text-white"><i class="bx bxs-face me-3"></i>Новые изменения</h5>
+                <h5 class="card-text text-black-50">@tasktracking_datetime[i]</h5>
+                <p class="card-text text-white">@tasktracking_var1[i]</p>
+                <p class="card-text text-white">@((MarkupString)@tasktracking_var2[i])</p>
+                <div class="avatar-group">
+                                                
+                                        @for (int j = 0; j<bc.parseUsers(tasktracking_var3[i]).Count; j++)
+                                        {
+                                        
+                                        <div class="avatar-group-item">
+                                            <a href="javascript: void(0);" class="d-inline-block">
+                                                <img src="~/assets/images/users/avatar-5.jpg" alt="" class="rounded-circle avatar-xs"/>
+                                            </a>
+                                        </div>
+                                           
+                                        }
+                 
+            </div>
+             
+
+        </div>
+    </div>
+                            </div>
+                            </div>
+                        </li>
+
+                                            
+                                            break;
+
+                                            
+                                            case "ADDATTACHMENTS":
+                                            
+                                                    List<string> lst_string = new List<string>();
+                                                    lst_string = bc.getMultipleStringDecodingString(tasktracking_var2[i]);           
+                                         
+                                    <li class="event-list">
+                            <div class="event-timeline-dot">
+                                <i class="bx bx-right-arrow-circle"></i>
+                            </div>
+                            <div class="d-flex">
+                                <div class="flex-shrink-0 me-3">
+                                    <i class="bx bx-error-circle h2 text-primary"></i>
+                                </div>
+                                <div class="col-lg-4">
+        <div class="card bg-info text-white-50">
+            <div class="card-body">
+                <h5 class="mb-4 text-white"><i class="bx bxs-face me-3"></i>Добавлены новые файлы</h5>
+                <h5 class="card-text text-black-50">@tasktracking_datetime[i]</h5>
+                <h5 class="card-text text-black-50">@((MarkupString)tasktracking_var1[i])</h5>
+
+                @for (int o = 0; o<lst_string.Count;o++)
+                {
+                    <div class="flex-shrink-0 me-3">
+                                    <i class="bx bx-file h2 text-primary"><a href="~/task_uploads/@lst_string[o]">@lst_string[o]</a> </i>
+                </div>
+                }
+                
+                
+
+                <div class="avatar-group">
+                                                
+                                        @for (int j = 0; j<bc.parseUsers(tasktracking_var3[i]).Count; j++)
+                                        {
+                                        
+                                        <div class="avatar-group-item">
+                                            <a href="javascript: void(0);" class="d-inline-block">
+                                                <img src="~/assets/images/users/avatar-5.jpg" alt="" class="rounded-circle avatar-xs"/>
+                                            </a>
+                                        </div>
+                                           
+                                        }
+                 
+            </div>
+             
+
+        </div>
+    </div>
+                            </div>
+                            </div>
+                        </li>
+                                            break;
+                                            case "REFUSE":
+
+                                            break;
+                                            case "ROGER":
+
+                                            break;
+                                            case "CHANGEDEADLINE":
+
+                                            break;
+                                            case "CHANGESTARTDATE":
+
+                                            break;
+                                            case "ADDGOALS":
+
+                                            break;
+                                            case "DELETEGOALS":
+
+                                            break;
+                                            case "MARKGOALS":
+
+                                            break;
+                                            case "DELEGATE":
+
+                                            break;
+                                            case "PERSONALCOMPLETE":
+
+                                            break;
+                                             case "PERSONALDELAY":
+
+                                            break;
+                                             case "PERSONALREFUSE":
+
+                                            break;
+                                             case "PERSONALUNDELEGATE":
+
+                                            break;
+                                            case "QUESTION":
+                                             <li class="event-list">
+                            <div class="event-timeline-dot">
+                                <i class="bx bx-right-arrow-circle"></i>
+                            </div>
+                            <div class="d-flex">
+                                <div class="flex-shrink-0 me-3">
+                                    <i class="bx bx-error-circle h2 text-primary"></i>
+                                </div>
+                                <div class="col-lg-4">
+        <div class="card bg-info">
+            <div class="card-body">
+                <h5 class="mb-4 text-white"><i class="bx bx-question-mark me-3"></i>Вопрос к исполнителям:</h5>
+                <h5 class="card-text text-black-50">@tasktracking_datetime[i]</h5>
+                <p class="card-text text-white">@tasktracking_var1[i]</p>
+                <p class="card-text text-white">@((MarkupString)@tasktracking_var2[i])</p>
+                <div class="avatar-group">
+                                                
+                                        @for (int j = 0; j<bc.parseUsers(tasktracking_var3[i]).Count; j++)
+                                        {
+                                        
+                                        <div class="avatar-group-item">
+                                            <a href="javascript: void(0);" class="d-inline-block">
+                                                <img src="~/assets/images/users/avatar-5.jpg" alt="" class="rounded-circle avatar-xs"/>
+                                            </a>
+                                        </div>
+                                           
+                                        }
+                 
+            </div>
+             
+
+        </div>
+    </div>
+                            </div>
+                            </div>
+                        </li>
+                                            break;
+                                            case "MESSAGE":
+                                               <li class="event-list">
+                            <div class="event-timeline-dot">
+                                <i class="bx bx-right-arrow-circle"></i>
+                            </div>
+                            <div class="d-flex">
+                                <div class="flex-shrink-0 me-3">
+                                    <i class="bx bx-error-circle h2 text-primary"></i>
+                                </div>
+                                <div class="col-lg-4">
+        <div class="card bg-info">
+            <div class="card-body">
+                <h5 class="mb-4 text-white"><i class="bx bx-error me-3"></i>Сообщение исполнителям</h5>
+                <h5 class="card-text text-black-50">@tasktracking_datetime[i]</h5>
+                <p class="card-text text-white">@((MarkupString)tasktracking_var1[i])</p>
+                <p class="card-text text-white">@tasktracking_var2[i]</p>
+                <div class="avatar-group">
+                                                
+                                        @for (int j = 0; j<bc.parseUsers(tasktracking_var3[i]).Count; j++)
+                                        {
+                                        
+                                        <div class="avatar-group-item">
+                                            <a href="javascript: void(0);" class="d-inline-block">
+                                                <img src="~/assets/images/users/avatar-5.jpg" alt="" class="rounded-circle avatar-xs"/>
+                                            </a>
+                                        </div>
+                                           
+                                        }
+                 
+            </div>
+             
+
+        </div>
+    </div></div>
+                            </div>
+                        </li>
+
+                                            break;
+                                            case "WARNING":
+
+                                            <li class="event-list">
+                            <div class="event-timeline-dot">
+                                <i class="bx bx-right-arrow-circle"></i>
+                            </div>
+                            <div class="d-flex">
+                                <div class="flex-shrink-0 me-3">
+                                    <i class="bx bx-error-circle h2 text-primary"></i>
+                                </div>
+                                <div class="col-lg-4">
+        <div class="card bg-warning">
+            <div class="card-body">
+                <h5 class="mb-4 text-white"><i class="bx bx-error me-3"></i>Предупреждение!</h5>
+                <h5 class="card-text text-black-50">@tasktracking_datetime[i]</h5>
+                <p class="card-text text-white">@tasktracking_var1[i]</p>
+                <p class="card-text text-white">@((MarkupString)@tasktracking_var2[i])</p>
+                <div class="avatar-group">
+                                                
+                                        @for (int j = 0; j<bc.parseUsers(tasktracking_var3[i]).Count; j++)
+                                        {
+                                        
+                                        <div class="avatar-group-item">
+                                            <a href="javascript: void(0);" class="d-inline-block">
+                                                <img src="~/assets/images/users/avatar-5.jpg" alt="" class="rounded-circle avatar-xs"/>
+                                            </a>
+                                        </div>
+                                           
+                                        }
+                 
+                                        </div>
+                                    </div>
+                                </div>
+                                </div>
+                            </div>
+                        </li>
+                                            break;
+                                            case "REVISION":
+
+                                            break;
+                                             case "CONCLUSION":
+
+                                            break;
+                                            default:
+
+                                            break;
+                                    }
+                                }
+                             }
+                        }
+                         
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- Окно действий -->
+
+<div class="card">
+            <div class="card-body">
+
+                <h4 class="card-title">Окно действия</h4>
+                <p class="card-title-desc">
+                    Выберите действие по задаче
+                </p>
+
+                
+                <!-- Nav tabs -->
+                <ul class="nav nav-pills nav-justified" role="tablist">
+                      @if (!isAdmin)
+                    {
+                    <li class="nav-item waves-effect waves-light">
+                        <a class="nav-link active" data-bs-toggle="tab" href="#panel-commit" role="tab">
+                            <span class="d-block d-sm-none"><i class="fas fa-home"></i></span>
+                            <span class="d-none d-sm-block">Новые изменения</span>
+                             
+                        </a>
+                    </li>
+                    <li class="nav-item waves-effect waves-light">
+                        <a class="nav-link" data-bs-toggle="tab" href="#panel-attachments" role="tab">
+                            <span class="d-block d-sm-none"><i class="far fa-user"></i></span>
+                            <span class="d-none d-sm-block">Отправить файл</span>
+                        </a>
+                    </li>
+                    <li class="nav-item waves-effect waves-light">
+                        <a class="nav-link" data-bs-toggle="tab" href="#panel-taskaction" role="tab">
+                            <span class="d-block d-sm-none"><i class="far fa-envelope"></i></span>
+                            <span class="d-none d-sm-block">Действия с задачей</span>
+                        </a>
+                    </li>
+                    }
+                    @if (isAdmin)
+                    {
+                    <li class="nav-item waves-effect waves-light">
+                        <a class="nav-link" data-bs-toggle="tab" href="#panel-warning" role="tab">
+                            <span class="d-block d-sm-none"><i class="fas fa-cog"></i></span>
+                            <span class="d-none d-sm-block">Вынести предупреждение</span>
+                        </a>
+                    </li>
+                    <li class="nav-item waves-effect waves-light">
+                        <a class="nav-link" data-bs-toggle="tab" href="#panel-question" role="tab">
+                            <span class="d-block d-sm-none"><i class="fas fa-cog"></i></span>
+                            <span class="d-none d-sm-block">Задать вопрос</span>
+                        </a>
+                    </li>
+                    <li class="nav-item waves-effect waves-light">
+                        <a class="nav-link" data-bs-toggle="tab" href="#panel-info" role="tab">
+                            <span class="d-block d-sm-none"><i class="fas fa-cog"></i></span>
+                            <span class="d-none d-sm-block">Опубликовать сообщение</span>
+                        </a>
+                    </li>
+                    }
+                </ul>
+
+                <!-- Tab panes -->
+                <div class="tab-content p-3 text-muted">
+                    <div class="tab-pane active" id="home-1" role="tabpanel">
+                        <p class="mb-0">
+                            Выберите одну из вкладок, чтобы выполнить определённые действия с задачей
+                        </p>
+                    </div>
+                    <div class="tab-pane" id="profile-1" role="tabpanel">
+                        <p class="mb-0">
+                            Food truck fixie locavore, accusamus mcsweeney's marfa nulla
+                            single-origin coffee squid. Exercitation +1 labore velit, blog
+                            sartorial PBR leggings next level wes anderson artisan four loko
+                            farm-to-table craft beer twee. Qui photo booth letterpress,
+                            commodo enim craft beer mlkshk aliquip jean shorts ullamco ad
+                            vinyl cillum PBR. Homo nostrud organic, assumenda labore
+                            aesthetic magna 8-bit.
+                        </p>
+                    </div>
+                    <div class="tab-pane" id="messages-1" role="tabpanel">
+                        <p class="mb-0">
+                            Etsy mixtape wayfarers, ethical wes anderson tofu before they
+                            sold out mcsweeney's organic lomo retro fanny pack lo-fi
+                            farm-to-table readymade. Messenger bag gentrify pitchfork
+                            tattooed craft beer, iphone skateboard locavore carles etsy
+                            salvia banksy hoodie helvetica. DIY synth PBR banksy irony.
+                            Leggings gentrify squid 8-bit cred pitchfork. Williamsburg banh
+                            mi whatever gluten-free.
+                        </p>
+                    </div>
+                    <div class="tab-pane" id="panel-commit" role="tabpanel">
+                    </div>
+                    </div>
+ 
+                    <!--Окно коммитов-->
+
+        <div class="form-group row mb-4">
+        <label for="ttm_commit_title" class="col-form-label col-lg-2">Краткое изложение</label>
+        <div class="col-lg-10">
+               <input id="ttm_commit_title" name="ttm_commit_title" type="text" asp-for="ttm_commit_title" placeholder="Введите краткое изложение изменений" class="form-control">
+        </div>
+        </div>
+  
+
+        <div class="form-group row mb-4">
+        <label for="ttm_commit_body" class="col-form-label col-lg-2">Что изменилось?</label>
+        <div class="col-lg-10">
+                 @*<textarea name="ttm_commit_body" id="taskdesc-editor" asp-for="ttm_commit_body"></textarea>
+                  <textarea name="ttm_info_body" id="taskdesc-editor-infobody" asp-for="ttm_info_body"></textarea>*@
+                      <div id="ttm_commit_body" asp-for="ttm_commit_body" name="ttm_commit_body" class="taskdesc-editor-class">
+               
+                 </div>
+         </div>
+        </div>
+   <!-- </div>-->
+
+
+     <div class="form-group row mb-4">
+        <label for="ttm_cast_coauthors" class="col-form-label col-lg-2">Совместно с</label>
+            <div class="col-lg-10">
+
+            <!-- <div style="width: 180px; overflow: hidden;">-->
+            <select class="mult-select2 inner form-control" asp-for="ttm_cast_coauthors" multiple="multiple" data-placeholder="Совместно с кем задача была выполнена">
+            <optgroup label="Отделы">
+            @for (int z = 0; z<divisions_ids.Count; z++)
+            {
+               <option value="@divisions_ids[z]">@divisions_name[z]</option>
+            }
+            </optgroup>
+            <optgroup label="Работники">
+            @for (int i = 0; i<users_dt.Count; i++)
+            {
+                <option value="@users_dt[i]">@fullname_dt[i]</option>
+            }
+            </optgroup>
+            </select>
+            </div>
+            </div>
+        <button type="button" @onclick='(() => SendTOScriptCmd("sendCommit"))' class="btn btn-success waves-effect waves-light">Сохранить изменения</button>
+      
+        </div>
+
+
+         <!--Окно сообщений-->
+                     <div class="tab-pane" id="panel-info" role="tabpanel">
+        
+   
+             <div class="form-group row mb-4">
+        <label for="ttm_cast_coauthors" class="col-form-label col-lg-2">Кому адресовано сообщение?</label>
+            <div class="col-lg-10">
+
+            <!-- <div style="width: 180px; overflow: hidden;">-->
+            <select class="mult-select2 inner form-control" asp-for="ttm_info_forwhom" multiple="multiple" data-placeholder="Кому адресовано сообщение?">
+            <optgroup label="Управляющий состав">
+            <option value="ADMIN_GROUP_ALL">Всем</option>
+            <option value="ADMIN_GROUP_ALL_EXCEPT_ADMINS">Всем исполнителям</option>
+             </optgroup>
+            <optgroup label="Отделы">
+            <option value="Всем">Всем</option>
+            @for (int z = 0; z<divisions_ids.Count; z++)
+            {
+               <option value="@divisions_ids[z]">@divisions_name[z]</option>
+            }
+            </optgroup>
+            <optgroup label="Работники">
+            @for (int i = 0; i<users_dt.Count; i++)
+            {
+                <option value="@users_dt[i]">@fullname_dt[i]</option>
+            }
+            </optgroup>
+            </select>
+            </div>
+            </div>
+
+        <div class="form-group row mb-4">
+        <label for="ttm_info_body" class="col-form-label col-lg-2">Сообщение:</label>
+        <div class="col-lg-10">
+                 <!--<textarea name="ttm_info_body" id="taskdesc-editor-infobody" asp-for="ttm_info_body"></textarea>-->
+                 <!--<textarea name="ttm_info_body" id="taskdesc-editor" ></textarea>-->
+                 <div id="ttm_info_body" asp-for="ttm_info_body" name="ttm_info_body" class="taskdesc-editor-class">
+               
+                 </div>
+  
+             </div>
+        </div>
+   <!-- </div>-->
+
+        <button type="submit" class="btn btn-success waves-effect waves-light">Отправить сообщение</button>
+
+
+                     </div>
+
+
+                      <!--Окно предупреждений -->
+                     <div class="tab-pane" id="panel-warning" role="tabpanel">
+        
+   
+             <div class="form-group row mb-4">
+        <label for="ttm_cast_coauthors" class="col-form-label col-lg-2">Кому адресовано предупреждение?</label>
+
+
+            <div class="col-lg-10">
+
+            <!-- <div style="width: 180px; overflow: hidden;">-->
+            <select class="mult-select2 inner form-control" asp-for="ttm_whom_warning" multiple="multiple" data-placeholder="Кому выписать предупреждение?">
+            <optgroup label="Управляющий состав">
+            <option value="ADMIN_GROUP_ALL">Всем</option>
+            <option value="ADMIN_GROUP_ALL_EXCEPT_ADMINS">Всем исполнителям</option>
+             </optgroup>
+            <optgroup label="Отделы">
+            <option value="Всем">Всем</option>
+            @for (int z = 0; z<divisions_ids.Count; z++)
+            {
+               <option value="@divisions_ids[z]">@divisions_name[z]</option>
+            }
+            </optgroup>
+            <optgroup label="Работники">
+            @for (int i = 0; i<users_dt.Count; i++)
+            {
+                <option value="@users_dt[i]">@fullname_dt[i]</option>
+            }
+            </optgroup>
+            </select>
+            </div>
+            </div>
+
+            <div class="form-group row mb-4">
+        <label for="ttm_warning_title" class="col-form-label col-lg-2">Заголовок предупреждения:</label>
+             <div class="col-lg-10">
+               <input id="ttm_warning_title" name="ttm_warning_title" type="text" asp-for="ttm_warning_title" placeholder="Введите заголовок предупреждения" class="form-control">
+        </div>
+        </div>
+
+        <div class="form-group row mb-4">
+        <label for="ttm_info_body" class="col-form-label col-lg-2">Текст предупреждения:</label>
+        <div class="col-lg-10">
+                 <!--<textarea name="ttm_info_body" id="taskdesc-editor-infobody" asp-for="ttm_info_body"></textarea>-->
+                 <!--<textarea name="ttm_info_body" id="taskdesc-editor" ></textarea>-->
+                 <div id="ttm_warning_body" asp-for="t tm_warning_body" name="ttm_warning_body" class="taskdesc-editor-class">
+               
+                 </div>
+  
+             </div>
+        </div>
+   <!-- </div>-->
+
+        <button type="submit" class="btn btn-success waves-effect waves-light">Отправить предупреждение</button>
+
+
+                     </div>
+
+
+                     <!--Окно вложений-->
+                     
+                     <div class="tab-pane" id="panel-attachments" role="tabpanel">
+        
+   
+             <div class="form-group row mb-4">
+         <label for="ttm_sendattachments_body" class="col-form-label col-lg-2">Описание вложений:</label>
+        <div class="col-lg-10">
+                 <!--<textarea name="ttm_info_body" id="taskdesc-editor-infobody" asp-for="ttm_info_body"></textarea>-->
+                 <!--<textarea name="ttm_info_body" id="taskdesc-editor" ></textarea>-->
+                 <div name="ttm_sendattachments_body" asp-for="ttm_sendattachments_body"  class="taskdesc-editor-class">
+               
+                 </div>
+        </div>
+            </div>
+
+        <div class="form-group row mb-4">
+        <label for="ttm_info_body" class="col-form-label col-lg-2">Приложенные файлы:</label>
+        <div class="col-lg-10">
+                 <!--<textarea name="ttm_info_body" id="taskdesc-editor-infobody" asp-for="ttm_info_body"></textarea>-->
+                 <!--<textarea name="ttm_info_body" id="taskdesc-editor" ></textarea>-->
+                <input class="form-control" type="file" required multiple asp-for="ttm_sendattachments">
+  
+             </div>
+        </div>
+   <!-- </div>-->
+
+        <button type="submit" class="btn btn-success waves-effect waves-light">Отправить файлы</button>
+
+
+                     </div>
+
+
+                     <!--Окно вопросов-->
+                       <div class="tab-pane" id="panel-question" role="tabpanel">
+        
+    
+             <div class="form-group row mb-4">
+        <label for="ttm_cast_coauthors" class="col-form-label col-lg-2">Кому адресован вопрос?</label>
+
+
+            <div class="col-lg-10">
+
+            <!-- <div style="width: 180px; overflow: hidden;">-->
+            <select class="mult-select2 inner form-control" asp-for="ttm_whom_question" multiple="multiple" data-placeholder="Кому задаём вопрос?">
+            <optgroup label="Управляющий состав">
+            <option value="ADMIN_GROUP_ALL">Всем</option>
+            <option value="ADMIN_GROUP_ALL_EXCEPT_ADMINS">Всем исполнителям</option>
+             </optgroup>
+            <optgroup label="Отделы">
+            <option value="Всем">Всем</option>
+            @for (int z = 0; z<divisions_ids.Count; z++)
+            {
+               <option value="@divisions_ids[z]">@divisions_name[z]</option>
+            }
+            </optgroup>
+            <optgroup label="Работники">
+            @for (int i = 0; i<users_dt.Count; i++)
+            {
+                <option value="@users_dt[i]">@fullname_dt[i]</option>
+            }
+            </optgroup>
+            </select>
+            </div>
+            </div>
+
+            <div class="form-group row mb-4">
+        <label for="ttm_question_title" class="col-form-label col-lg-2">Заголовок вопроса:</label>
+             <div class="col-lg-10">
+               <input id="ttm_question_title" name="ttm_question_title" type="text" asp-for="ttm_question_title" placeholder="Введите заголовок вопроса" class="form-control">
+        </div>
+        </div>
+
+        <div class="form-group row mb-4">
+        <label for="ttm_question_body" class="col-form-label col-lg-2">Текст вопроса:</label>
+        <div class="col-lg-10">
+                 <!--<textarea name="ttm_info_body" id="taskdesc-editor-infobody" asp-for="ttm_info_body"></textarea>-->
+                 <!--<textarea name="ttm_info_body" id="taskdesc-editor" ></textarea>-->
+                 <div id="ttm_question_body" asp-for="ttm_question_body" name="ttm_question_body" class="taskdesc-editor-class">
+               
+                 </div>
+  
+             </div>
+        </div>
+   <!-- </div>-->
+
+        <button type="button"  class="btn btn-success waves-effect waves-light">Отправить вопрос</button>
+
+                     </div>
+
+            @{
+                bool isInTime = false;
+                DateTime localDateTime = DateTime.MinValue;
+
+                var client = new TcpClient("time.nist.gov", 13);
+                using (var streamReader = new StreamReader(client.GetStream()))
+                {
+                    var response = streamReader.ReadToEnd();
+                    var utcDateTimeString = response.Substring(7, 17);
+                    localDateTime = DateTime.ParseExact(utcDateTimeString, "yy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
+                }
+                //string datetime_end = @tasks_end_dt[0];
+
+                //string str = Context.Request.Cookies["tasktracking"];
+                //string str = await GetLocalStorageItems("tasktracking");
+
+                    string datetime_end = tasks_end_dt[0];
+                    DateTime dt_datetime_end = DateTime.MinValue;
+                    TimeSpan ts = new TimeSpan();
+
+                    if (DateTime.TryParse(datetime_end,out DateTime dt))
+                    {
+                        dt_datetime_end = DateTime.Parse(datetime_end);
+                    }
+
+                    if (dt_datetime_end > localDateTime)
+                    {
+                        isInTime = true;
+                        ts = (dt_datetime_end-localDateTime).Duration();
+                    }
+                    else
+                    {
+                        isInTime = false;
+                        ts = (localDateTime - dt_datetime_end).Duration();
+                    }
+
+                    bool isAllPointsCompleted = false;
+
+
+                }
+
+<div class="tab-pane" id="panel-taskaction" role="tabpanel">
+     
+  <!--Окно действий с задачей-->
+    <!--<input type="hidden" asp-for="task_id" value> -->
+      
+  <button type="button" class="btn btn-success waves-effect waves-light" data-bs-toggle="modal" data-bs-target="#modalactioncompletetask">Завершить выполнение задачи</button>
+
+                    <!-- sample modal content -->
+                    <div id="modalactioncompletetask" class="modal fade" tabindex="-1" aria-labelledby="#modalactioncompletetask" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="modalactioncompletetask">Завершение задачи</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="form-group row mb-4">
+        <label for="ttm_question_title">Вы собираетесь завершить задачу</label>
+             
+        @if (isInTime)
+        {
+        <div class="col-lg-10">
+               <p style="color:green"><b>Задача выполнена в срок!</b></p>
+               <p>Осталось @ts.Days дней @ts.Hours часов @ts.Minutes минут</p>
+        </div>                              
+        }
+        else
+        {
+            <div class="col-lg-10">
+               <p style="color:red"><b>Задача выполнена c опозданием!</b></p>
+               <p>Осталось @ts.Days дней @ts.Hours часов @ts.Minutes минут</p>
+        </div>         
+        }
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary waves-effect" data-bs-dismiss="modal">Закрыть</button>
+                                    
+                                    @if (!isInTime)
+                                    {
+
+                                    <button type="button"  @onclick='(() => SendTOScriptCmd("COMPLETEDELAY"))' class="btn btn-primary waves-effect waves-light">Завершить задачу (с задержкой)</button>
+                                    }
+                                    @if (isInTime)
+                                    {
+                                        if (@ts.Days > 1)
+                                        {
+                                        
+                                        <button type="button" @onclick='(() => SendTOScriptCmd("COMPLETEBEFOREHAND"))' class="btn btn-primary waves-effect waves-light">Завершить задачу (заранее)</button>
+                      
+                                        }
+                                        else
+                                        {
+                                             
+                                    <button type="button" @onclick='(() => SendTOScriptCmd("COMPLETE"))' class="btn btn-primary waves-effect waves-light">Завершить задачу (в срок)</button>
+                                        }
+                                    }
+
+                                   
+
+                                        
+
+                                        
+                                </div>
+                            </div><!-- /.modal-content -->
+                        </div><!-- /.modal-dialog -->
+                    </div><!-- /.modal -->
+
+       
+</div>
+
+<!-- Modal -->
+
+<button type="button" class="btn btn-danger waves-effect waves-light" data-bs-toggle="modal" data-bs-target="#modalactionrefusetask">Отказываюсь выполнять задачу</button>
+
+
+                    <!-- sample modal content -->
+                    <div id="modalactionrefusetask" class="modal fade" tabindex="-1" aria-labelledby="#modalactionrefusetask" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="modalactionrefusetask">Отменить выполнение задачи</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="form-group row mb-4">
+        <label for="ttm_question_title">Почему вы хотите отказать выполнять задачу?</label>
+             
+        
+        <ul>
+            <li><p><button type="button" @onclick='(() => SendTOScriptCmd("REFUSE_NOTME"))' class="btn btn-primary waves-effect waves-light">Эта задача со мной не связана</button></p></li>
+            <li><p><button type="button" @onclick='(() => SendTOScriptCmd("REFUSE_IMPOSSIBLE"))' class="btn btn-primary waves-effect waves-light">Считаю её невозможной</button></p></li>
+             <li><p><button type="button" @onclick='(() => SendTOScriptCmd("REFUSE_NOWAY"))' class="btn btn-primary waves-effect waves-light">Не согласен с условиями выполнения задачи</button></p></li>
+        </ul>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary waves-effect" data-bs-dismiss="modal">Закрыть</button>
+                                    
+                                </div>
+                            </div><!-- /.modal-content -->
+                        </div><!-- /.modal-dialog -->
+                    </div><!-- /.modal -->
+
+       
+</div>
+
+<!-- Modal -->       
+
+       <button type="button" class="btn btn-danger waves-effect waves-light" data-bs-toggle="modal" data-bs-target="#modaldelaytask">Запрос о переносе сроков</button>
+
+                <!-- sample modal content -->
+                    <div id="modaldelaytask" class="modal fade" tabindex="-1" aria-labelledby="#modaldelaytask" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="modalactionrefusetask">Перенос сроков выполнения задачи</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="form-group row mb-4">
+        
+        <label for="ttm_question_title">Почему вы хотите перенести сроки выполнения задачи?</label>
+           
+        <ul>
+            <li><p><button type="button" @onclick='(() => SendTOScriptCmd("DELAY_OTHERTASK"))' class="btn btn-primary waves-effect waves-light">Происходит наслоение других задач</button></p></li>
+            <li><p><button type="submit" @onclick='(() => SendTOScriptCmd("DELAY_LACKTIME"))' class="btn btn-primary waves-effect waves-light">Не хватает времени на её выполнение</button></p></li>
+            <li><p><button type="submit" @onclick='(() => SendTOScriptCmd("DELAY_FORCEM"))' class="btn btn-primary waves-effect waves-light">Произошёл форс-мажор</button></p></li>
+            <li><p><button type="submit" @onclick='(() => SendTOScriptCmd("DELAY_NOMONEY"))' class="btn btn-primary waves-effect waves-light">Недостаточно финансирования</button></p></li>
+            <li><p><button type="submit" @onclick='(() => SendTOScriptCmd("DELAY_GUILTYMEMBER"))' class="btn btn-primary waves-effect waves-light">Виноват другой(ие)</button></p></li>
+            <li><p><button type="submit" @onclick='(() => SendTOScriptCmd("DELAY_OTHER"))' class="btn btn-primary waves-effect waves-light">Другая причина</button></p></li>
+        </ul>
+        </div>
+        
+        <div class="modal-footer">
+             <button type="button" class="btn btn-secondary waves-effect" data-bs-dismiss="modal">Закрыть</button>
+        </div>
+        </div><!-- /.modal-content -->
+        </div><!-- /.modal-dialog -->
+        </div><!-- /.modal -->
+
+       
+</div>
+
+<!-- Modal -->       
+
+            </div>
+        </div>
+
+@functions
+{
+
+    public void SendTOScriptCmd(string simple_task)
+    {
+
+    }
+
+    public void SendTOScriptCmd(string task_code, string args1)
+    {
+
+    }
+
+    public void SendTOScriptCmd(string task_code, string args1,string args2)
+    {
+
+    }
+
+    protected async override Task OnInitializedAsync()
+    {
+        tasks_name_dt = await mysqlc.getListTaskNameByIDAsync(task_id.ToString());
+        tasks_budgets_dt = await mysqlc.getListTaskBudgetByIDAsync(task_id.ToString());
+        tasks_members_dt = await mysqlc.getListTaskMembersByIDAsync(task_id.ToString());
+        tasks_status_dt = await mysqlc.getListTaskStatusByIDAsync(task_id.ToString());
+        tasks_author_dt = await mysqlc.getListTasksAuthorByIDAsync(task_id.ToString());
+        tasks_start_dt = await mysqlc.getListTaskStartDateByIDAsync(task_id.ToString());
+        tasks_end_dt = await mysqlc.getListTaskEndDateByIDAsync(task_id.ToString());
+        tasks_proj_dt = await mysqlc.getListTaskProjByIDAsync(task_id.ToString());
+        tasktracking_author = await mysqlc.getListTaskTrackingAuthorAsync(task_id.ToString());
+        tasktracking_cmd = await mysqlc.getListTaskTrackingMainCmdAsync(task_id.ToString());
+        tasktracking_datetime = await mysqlc.getListTaskTrackingMainDateTimeAsync(task_id.ToString());
+        tasktracking_var1 = await mysqlc.getListTaskTrackingMainVar1Async(task_id.ToString());
+        tasktracking_var2 = await mysqlc.getListTaskTrackingMainVar2Async(task_id.ToString());
+        tasktracking_var3 = await mysqlc.getListTaskTrackingMainVar3Async(task_id.ToString());
+        users_dt = await mysqlc.getListUsersLoginAsync();
+
+        card_body = await mysqlc.getListTaskTrackingCardBodyAsync(task_id.ToString());
+        card_marksdown = await mysqlc.getListTaskTrackingCardMarksDownAsync(task_id.ToString());
+        card_author = await mysqlc.getListTaskTrackingCardActionAuthorAsync(task_id.ToString());
+        card_status = await mysqlc.getListTaskTrackingCardStatusAsync(task_id.ToString());
+        card_action_datetime = await mysqlc.getListTaskTrackingCardActionDateTimeAsync(task_id.ToString());
+
+        fullname_dt = await mysqlc.getListUsersFullnameAsync();
+        divisions_ids = await mysqlc.getListDivisionsIDAsync();
+        divisions_name = await mysqlc.getListDivisionsNameAsync();
+
+        tasks_id_dt = await mysqlc.getListTaskIDAsync();
+
+        task_id = int.MinValue;
+        //string task_id_cookie = Context.Request.Cookies["tasktracking"];
+
+
+        if (await localStorage.GetItemAsStringAsync("task_tracking_id") == null)
+        {
+            task_id_cookie  = "";
+        }
+        else
+        {
+            task_id_cookie = await localStorage.GetItemAsStringAsync("task_tracking_id");
+        }
+
+        if (task_id_cookie != null && task_id_cookie != "")
+        {
+            if (int.TryParse(task_id_cookie,out int a))
+            {
+                task_id = int.Parse(task_id_cookie);
+            }
+        }
+
+        ready = true;
+    }
+}
+
+
+@code {
+    bool ready = false;
+    private int _localStorageCount;
+            private IList<KeyValuePair<string, string>> _localStorageItems;
+
+
+            private async Task<string> GetLocalStorageItems(string key)
+            {
+                return await localStorage.GetItemAsStringAsync(key);
+            }
+
+            private BackendController bc = new BackendController();
+            private MySQL_Controller mysqlc = new MySQL_Controller();
+            //Tasks Main
+
+            List<string> tasks_name_dt = new List<string>();
+            List<string> tasks_budgets_dt = new List<string>();
+            List<string> tasks_members_dt = new List<string>();
+            List<string> tasks_status_dt = new List<string>();
+            List<string> tasks_author_dt = new List<string>();
+            List<string> tasks_start_dt = new List<string>();
+            List<string> tasks_end_dt = new List<string>();
+            List<string> tasks_proj_dt = new List<string>();
+            List<string> tasktracking_author = new List<string>();
+            List<string> tasktracking_cmd = new List<string>();
+            List<string> tasktracking_datetime = new List<string>();
+            List<string> tasktracking_var1 = new List<string>();
+            List<string> tasktracking_var2 = new List<string>();
+            List<string> tasks_id_dt = new List<string>();
+
+            List<string> tasktracking_var3 = new List<string>();
+            List<string> users_dt = new List<string>();
+            List<string> card_body = new List<string>();
+            List<string> card_marksdown = new List<string>();
+            List<string> card_author = new List<string>();
+            List<string> card_status = new List<string>();
+            List<string> card_action_datetime = new List<string>();
+
+            List<string> fullname_dt = new List<string>();
+            List<string> divisions_ids = new List<string>();
+            List<string> divisions_name = new List<string>();
+
+            int task_id { get; set; }
+            string task_id_cookie { get; set; }
+            bool isAdmin { get; set; }
+
+        private string GetUniqueFileName(string fileName)
+        {
+            string filename = Path.GetFileNameWithoutExtension(fileName);
+            filename = filename.Substring(0, 60);
+
+            if (fileName.Length > 60)
+            {
+                fileName = fileName.Substring(0, 60);
+            }
+
+
+            return (filename)
+                      + "_"
+                      + Guid.NewGuid().ToString().Substring(0, 6)
+                      + Path.GetExtension(fileName);
+
+        }
+
+      
+        }

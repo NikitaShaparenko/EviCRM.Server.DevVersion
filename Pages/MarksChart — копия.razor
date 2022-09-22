@@ -1,0 +1,516 @@
+﻿@page "/marks_chart"
+@using EviCRM.Server.Core
+@using System.Collections.Generic;
+@using System.Net
+@using EviCRM.Server.Pages.Tasks.Components
+@using EviCRM.Server.ViewModels
+@using System.IO
+@using EviCRM.Server.Pages.Modals;
+
+@inject SignInManager<IdentityUser> SignInManager
+@inject UserManager<IdentityUser> UserManager
+
+@using Humanizer.Bytes
+@using Majorsoft.Blazor.Components.Modal
+@using Majorsoft.Blazor.Extensions.BrowserStorage
+
+@using Microsoft.AspNetCore.Identity
+@using Radzen.Blazor
+@using System.Globalization
+@using System.Security.AccessControl
+
+@inject NavigationManager UriHelper
+@inject IWebHostEnvironment _env
+@inject ILocalStorageService _localStorageService
+@inject ISessionStorageService _sessionStorageService
+
+@inject SignInManager<IdentityUser> SignInManager
+@inject AuthenticationStateProvider authStateProvider
+
+
+<h5>Дневник</h5>
+
+
+
+<style>
+.button_transparent {
+    background-color: Transparent;
+    background-repeat:no-repeat;
+    border: none;
+    cursor:pointer;
+    overflow: hidden;
+    outline:none;
+}
+ .select-css { 
+display: block; 
+font-size: 16px; 
+font-family: sans-serif; 
+font-weight: 700; 
+color: #444; 
+line-height: 1.3; 
+padding: .6em 1.4em .5em .8em; 
+max-width: 100%; 
+box-sizing: border-box; 
+margin: 0; 
+border: 1px solid #aaa;
+ box-shadow: 0 1px 0 1px rgba(0,0,0,.04); 
+border-radius: .5em;
+ -moz-appearance: none;
+ -webkit-appearance: none;
+ appearance: none;
+ background-color: #fff; 
+background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23007CB2%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E'), linear-gradient(to bottom, #ffffff 0%,#e5e5e5 100%); 
+background-repeat: no-repeat, repeat;
+background-position: right .7em top 50%, 0 0;
+background-size: .65em auto, 100%; 
+} 
+ .select-css::-ms-expand { display: none; } 
+ .select-css:hover { border-color: #888; } 
+ .select-css:focus { border-color: #aaa; 
+ box-shadow: 0 0 1px 3px rgba(59, 153, 252, .7);
+ box-shadow: 0 0 0 3px -moz-mac-focusring; 
+color: #222;
+ outline: none; 
+} 
+ .select-css option { font-weight:normal; } 
+ *[dir="rtl"] .select-css, :root:lang(ar) .select-css, :root:lang(iw) .select-css { 
+background-position: left .7em top 50%, 0 0; 
+padding: .6em .8em .5em 1.4em; 
+}</style>
+
+ <div class="input-daterange input-group" data-provide="datepicker">
+                                        
+<select class="select-css" id="ddm_month" @bind="onchange_month">
+  <option value="1">Январь</option>
+  <option value="2">Февраль</option>
+  <option value="3">Март</option>
+  <option value="4">Апрель</option>
+  <option value="5" selected>Май</option>
+  <option value="6">Июнь</option>
+  <option value="7">Июль</option>
+  <option value="8">Август</option>
+  <option value="9">Сентябрь</option>
+  <option value="10">Октябрь</option>
+  <option value="11">Ноябрь</option>
+  <option value="12">Декабрь</option>
+</select>
+<p></p>
+<select name="ddm_year" class="select-css" id="ddm_year" @bind="onchange_year" > <!--Supplement an id here instead of using 'name'-->
+  <option value="2022" selected>2022</option>
+  <option value="2023">2023</option>
+    <option value="2024">2024</option>
+      <option value="2025">2025</option>
+        <option value="2026">2026</option>
+          <option value="2027">2027</option>
+            <option value="2028">2028</option>
+              <option value="2029">2029</option>
+                <option value="2030">2030</option>
+</select>
+</div>
+
+<div class="card">
+            <div class="card-body">
+                <h4 class="card-title mb-4">Журнал оценок</h4>
+
+               
+                 
+                <div class="table-responsive">
+                    <table class="table table-nowrap align-middle mb-0">
+                     
+                        <thead class="table-light">
+                            <tr>
+                                <th scope="col" style="width: 70px;">#</th>
+                                <th scope="col">Имя сотрудника</th>
+                                
+                                @foreach(int days in days_num)
+                                {
+                                    <th scope="col">@(days+1) (@WhatIsTheDayToday(days+1))</th>
+                                }
+
+                            </tr>
+                        </thead>
+                        <tbody>
+                                @{
+                                    int i = -1;
+                                    }
+                                @foreach(string user in users_dt)
+                                {
+                                        i++;
+                                        var temp = i;
+                                    <tr>
+                                       <td>@(i+1)</td>
+                                       <td>@fullname_dt[i]</td>
+                                       @foreach(int days in days_num)
+                                       {
+                                           <td><button @onclick="() => ShowInfo(temp,days)" class="button_transparent" style="color:red"><i>@i/@days</i></button></td>
+                                       }
+                                   </tr>
+                                }
+                         </tbody>
+                                @if (users_dt.Count == 0)
+                                {
+                                    <h5 class="text-truncate font-size-14 m-0"><a href="javascript: void(0);" class="text-dark">Нет пользователей</a></h5>
+                                }
+                            
+                    </table>
+                </div>
+            </div>
+        </div>
+
+
+@if (DeleteDialogOpen)
+{
+
+}
+   
+
+@functions{
+
+    List<FileUploadProgress> uploadedFiles = new();
+
+    private async ValueTask LoadFiles(InputFileChangeEventArgs e)
+    {
+        var files = e.GetMultipleFiles(maximumFileCount: 100);
+
+        var startIndex = uploadedFiles.Count;
+
+        // Add all files to the UI
+        foreach (var file in files)
+        {
+            var progress = new FileUploadProgress(file.Name, file.Size);
+            uploadedFiles.Add(progress);
+        }
+
+        // We don't want to refresh the UI too frequently,
+        // So, we use a timer to update the UI every few hundred milliseconds
+        await using var timer = new Timer(_ => InvokeAsync(() => StateHasChanged()));
+        timer.Change(TimeSpan.FromMilliseconds(500), TimeSpan.FromMilliseconds(500));
+
+        // Upload files
+        byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(4096);
+
+        IFormFile file2 = null;
+
+        foreach (var file in files)
+        {
+            using var stream = file.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024);
+            while (await stream.ReadAsync(buffer) is int read && read > 0)
+            {
+                uploadedFiles[startIndex].UploadedBytes += read;
+
+                // TODO Do something with the file chunk, such as save it
+                // to a database or a local file system
+                var readData = buffer.AsMemory().Slice(0, read);
+                file2 = new FormFile(stream, 0, stream.Length, "name", "fileName.extension");
+
+            }
+
+
+            startIndex++;
+        }
+
+        System.Buffers.ArrayPool<byte>.Shared.Return(buffer);
+        var files_lcl = e.GetMultipleFiles(maximumFileCount: 100);
+
+        Thread.Sleep(1000);
+
+        foreach(var files_elem in files_lcl)
+        {
+            //var path = "C:\\uploads";
+            var path = Path.Combine(_env.ContentRootPath, "wwwroot", "upload", files_elem.Name);
+
+              Thread.Sleep(1000);
+
+            @if(ftp.DoesFtpDirectoryExist("ftp://78.140.233.179:2222/","ftp_c","","ftp://78.140.233.179:2222/x"))
+            {
+                Console.WriteLine("FTP Manager: Directory exists!");
+                ftp.UploadFile(file2, "ftp://78.140.233.179:2222/x/evicrm/marks_chart/" + files_elem.Name, "ftp://78.140.233.179:2222/", "ftp_c", "");
+            }
+
+    await using FileStream fs = new(path, FileMode.Create);
+            await files_elem.OpenReadStream(512000*1024).CopyToAsync(fs);
+        }
+
+        // Update the UI with the final progress
+        StateHasChanged();
+
+
+
+    }
+
+    // Use the Meziantou.Framework.ByteSize NuGet package.
+    // You could also use Humanizer
+    string FormatBytes(long value)
+        => ByteSize.FromBytes(value).ToString("fi2", CultureInfo.CurrentCulture);
+
+    record FileUploadProgress(string FileName, long Size)
+    {
+        public long UploadedBytes { get; set; }
+        public double UploadedPercentage => (double)UploadedBytes / (double)Size * 100d;
+    }
+
+
+    public void ShowInfo(int i, int day)
+    {
+        //Собираем информацию
+
+        //Итак, user_id - это порядковый номер в user_id_dt
+        //day = день месяца
+        //current_month - текущий месяц
+        //current_year - текущий год
+
+        //Собираем дату в формате ДД.ММ.ГГГГ
+
+        day += 1;
+
+        string date_format = day + "." + current_month + "." + current_year;
+        modal_date_full = date_format;
+        modal_fullname = fullname_dt[i];
+
+        ModalLoadUserInfo(users_dt[i].ToString());
+
+        modal_firstmark = "5";
+        modal_secondmark = "5";
+        _marksDialog.Open();
+
+
+    }
+
+    public void ModalLoadUserInfo(string user_id)
+    {
+
+    }
+
+
+
+    public string onchange_month
+    {
+        get {return current_month;}
+        set
+        {
+            current_month=value;
+            OnChange_month();
+        }
+    }
+
+    public string onchange_year
+    {
+        get {return current_year;}
+        set
+        {
+            current_year=value;
+            OnChange_years();
+        }
+    }
+
+    string WhatIsTheDayToday(int current_day)
+    {
+        DateTime dt = new DateTime(int.Parse(current_year), int.Parse(current_month), current_day);
+
+        switch(dt.DayOfWeek)
+        {
+            case DayOfWeek.Monday:
+                {
+                    return "Пн";
+                }
+            case DayOfWeek.Tuesday:
+                {
+                    return "Вт";
+                }
+            case DayOfWeek.Wednesday:
+                {
+                    return "Ср";
+                }
+            case DayOfWeek.Thursday:
+                {
+                    return "Чт";
+                }
+            case DayOfWeek.Friday:
+                {
+                    return "Пт";
+                }
+            case DayOfWeek.Saturday:
+                {
+                    return "Сб";
+                }
+            case DayOfWeek.Sunday:
+                {
+                    return "Вс";
+                }
+        }
+        return "??";
+    }
+
+    int MonthNum()
+    {
+        int month_num = 0;
+        switch(current_month)
+        {
+            case "Январь":
+                month_num = 1;
+                break;
+            case "Февраль":
+                month_num = 2;
+                break;
+            case "Март":
+                month_num = 3;
+                break;
+            case "Апрель":
+                month_num = 4;
+                break;
+            case "Май":
+                month_num = 5;
+                break;
+            case "Июнь":
+                month_num = 6;
+                break;
+            case "Июль":
+                month_num = 7;
+                break;
+            case "Август":
+                month_num = 8;
+                break;
+            case "Сентябрь":
+                month_num = 9;
+                break;
+            case "Октябрь":
+                month_num = 10;
+                break;
+            case "Ноябрь":
+                month_num = 11;
+                break;
+            case "Декабрь":
+                month_num = 12;
+                break;
+        }
+        return month_num;
+    }
+
+    void DayCounter()
+    {
+
+        days_num.Clear();
+        day_num = DateTime.DaysInMonth(int.Parse(current_year),int.Parse(current_month));
+        for (int i = 0; i< day_num;i++)
+        {
+            days_num.Add(i);
+            StateHasChanged();
+        }
+
+        foreach(string str in marks_date)
+        {
+            
+        }
+
+    }
+}
+
+@code {
+
+    private Majorsoft.Blazor.Components.Modal.ModalDialog _marksDialog;
+
+    List<int> days_num = new List<int>();
+
+    private MySQL_Controller mysqlc = new MySQL_Controller();
+    public static BackendController bc = new BackendController();
+    public FTP_Controller ftp = new FTP_Controller();
+
+    public int num { get; set; }
+    int day_num { get; set; } //Сколько дней в месяце
+
+    string modal_firstmark { get; set; }
+    string modal_secondmark { get; set; }
+    string modal_firstdescription { get; set;}
+    string modal_seconddescription { get; set;}
+    string modal_fullname { get; set;}
+    string modal_date_full { get; set; }
+    string modal_cmd { get; set; } //NEW, EDIT
+
+    bool ready = false;
+    List<string> users_dt = new List<string>();
+    List<string> email_dt = new List<string>();
+    List<string> passwords_dt = new List<string>();
+    List<string> id_dt = new List<string>();
+    List<string> fullname_dt = new List<string>();
+    List<string> position_dt = new List<string>();
+    List<string> skills_dt = new List<string>();
+    List<string> avatarpath_dt = new List<string>();
+    List<string> projects_val_dt = new List<string>();
+
+    List<string> marks_idmarks = new List<string>();
+    List<string> marks_user_id = new List<string>();
+    List<string> marks_date = new List<string>();
+    List<string> marks_first_mark = new List<string>();
+    List<string> marks_second_mark = new List<string>();
+    List<string> marks_first_description = new List<string>();
+    List<string> marks_second_description = new List<string>();
+    List<string> marks_attachments = new List<string>();
+
+    IEnumerable<string> months_ienum;
+    IEnumerable<string> years_ienum;
+    List<string> month = new List<string>(new string[] {"Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"});
+    List<string> years = new List<string>(new string[] {"2022", "2023", "2024", "2025", "2026", "2027", "2028", "2029", "2030", "2031", "2032", "2033"});
+
+
+    protected async override Task OnInitializedAsync()
+    {
+        users_dt = await mysqlc.getListUsersLoginAsync();
+        email_dt = await mysqlc.getListUsersEmailAsync();
+        passwords_dt = await mysqlc.getListUsersPasswordAsync();
+        id_dt = await mysqlc.getListUsersIDAsync();
+        fullname_dt = await mysqlc.getListUsersFullnameAsync();
+        position_dt = await mysqlc.getListUsersPositionsAsync();
+        skills_dt = await mysqlc.getListUsersSkills();
+        avatarpath_dt = mysqlc.getAvatarPaths(users_dt);
+        projects_val_dt = await mysqlc.getListUsersProjectsAsync();
+
+        marks_idmarks = await mysqlc.getListMarksIDAsync();
+        marks_user_id = await mysqlc.getListMarksUserIDAsync();
+        marks_date = await mysqlc.getListMarksDateAsync();
+        marks_first_mark = await mysqlc.getListMarksFirstMarkAsync();
+        marks_second_mark = await mysqlc.getListMarksSecondMarkAsync();
+        marks_first_description = await mysqlc.getListMarksFirstDescriptionAsync();
+        marks_second_description = await mysqlc.getListMarksSecondDescriptionAsync();
+        marks_attachments = await mysqlc.getListMarksAtthachmentsAsync() ;
+        int p = 0;
+        if (users_dt != null)
+        {
+            p = users_dt.Count;
+        }
+
+        ready = true;
+       
+    }
+
+    string current_month { get; set;}
+    string current_year { get; set; }
+
+
+
+    protected override void OnInitialized()
+    {
+
+        current_month = "5";
+        current_year = "2022";
+        months_ienum = month.AsEnumerable();
+        years_ienum = years.AsEnumerable();
+         DayCounter();
+    }
+
+    void OnChange_month()
+    {
+        //var str = value is IEnumerable<object> ? string.Join(", ", (IEnumerable<object>)value) : value;
+  
+        DayCounter();
+        StateHasChanged();
+        
+    }
+    void OnChange_years()
+    {
+        //var str = value is IEnumerable<object> ? string.Join(", ", (IEnumerable<object>)value) : value;
+        //    current_year = str.ToString();
+        DayCounter();
+            StateHasChanged();
+    }
+
+}

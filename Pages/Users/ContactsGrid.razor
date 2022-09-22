@@ -1,0 +1,329 @@
+﻿@page "/users_grid"
+
+@using EviCRM.Server.Core
+@using EviCRM.Server.ViewModels
+@using Microsoft.AspNetCore.SignalR.Client
+
+@inject NavigationManager NavigationManager;
+@inject NavigationManager uriHelper;
+@inject AuthenticationStateProvider authStateProvider
+
+@inject BackendController bc
+@inject Context _context
+@inject SystemCore sc
+@inject Sentinel sentinel
+
+@inject IToastService _toastService
+
+<PageTitle>Пользователи \ Сеткой</PageTitle>
+<h5>Пользователи \ Сеткой</h5>
+
+<style>
+    /* Кнопки стиля */
+    .btn-link {
+        /*background-color: DodgerBlue;*/ /* Синий фон */
+        background-color: lightskyblue;
+        border: none; /* Удалить границы */
+        color: white; /* Белый текст */
+        padding: 12px 16px; /* Немного отступов */
+        font-size: 16px; /* Установите размер шрифта */
+        cursor: pointer; /* Указатель мыши при наведении */
+    }
+        /* Более темный фон при наведении курсора мыши */
+        .btn-link:hover {
+            background-color: RoyalBlue;
+        }
+
+    .btn-link-without-color {
+        /*background-color: DodgerBlue;*/ /* Синий фон */
+        border: none; /* Удалить границы */
+        color: white; /* Белый текст */
+        padding: 12px 16px; /* Немного отступов */
+        font-size: 16px; /* Установите размер шрифта */
+        cursor: pointer; /* Указатель мыши при наведении */
+    }
+
+</style>
+
+<AuthorizeView>
+    <Authorized>
+
+        @if (ready == false)
+        {
+            <p><i class="bx bx-buoy bx-spin text-primary display-3"></i><i> Нужно немного времени, чтобы загрузить эту страницу</i></p>
+            <p><i>Пожалуйста подождите...</i></p>
+        }
+        else
+        {
+
+            <div class="row">
+
+                @if (Users.Count > 0)
+                {
+                    foreach (var elem in Users)
+                    {
+                        <ContactsGrid_User user=@elem />
+                    }
+                }
+            </div>
+
+            <p></p>
+
+            <h6>Контакты, которые передала Александра</h6>
+
+            @if (Alexandra_Users != null)
+            {
+                <div class="row">
+
+                    @foreach (var elem in Alexandra_Users)
+                    {
+                        <div class="col-xl-3 col-sm-6">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <div class="avatar-sm mx-auto mb-4">
+                                        <span class="avatar-title rounded-circle bg-primary bg-soft text-primary font-size-16">
+                                            @{
+                                                string str = elem.firstname.ToUpper();
+                                                char b_str = '?';
+                                                if (str.Length > 0)
+                                                {
+                                                    b_str = str[0];
+                                                }
+                                                @b_str
+                                            }
+                                        </span>
+                                    </div>
+                                    <h5 class="font-size-15 mb-1">@(elem.firstname + " " + elem.lastname)</h5>
+                                    <p class="text-muted"> <a href="tel:@elem.phonenumber">@elem.phonenumber</a></p>
+                                </div>
+                                <div class="card-footer bg-transparent border-top">
+                                    <div class="contact-links d-flex font-size-20">
+                                        <div class="flex-fill">
+                                            <a class="btn btn-primary btn-link" href="tg://user?id=@elem.userId" role="button"><i class="fab fa-telegram-plane ms-1"></i></a>
+                                        </div>
+                                        <div class="flex-fill">
+                                            <button type="button" class="btn btn-danger btn-link-without-color" @onclick="async()=> await KillContact(elem)"><i class="fas fa-times ms-1"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                </div>
+            }
+        }
+
+    </Authorized>
+    <NotAuthorized>
+        <AuthorizationPrompt Title="Вам необходимо зарегистрироваться или войти! " />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code{
+
+      //Toasts:
+
+    #region Toasts Notifications
+
+     //Toast Notifications
+        private string _toastText = $@"<strong>Toast:</strong> This is a(n) {NotificationTypes.Primary} notification";
+	    private bool _toastShowIcon = true;
+	    private bool _toastShowCloseButton = true;
+	    private bool _toastShowCountdownProgress = true;
+	    private uint _toastAutoCloseInSec = 5;
+	    private uint _toastShadowEffect = 5;
+	    private NotificationStyles _toastStyle;
+	    private NotificationTypes _toastTypeLevel;
+
+    //Toasts
+    private async Task ToastsNotifications_ShowAllToast()
+    {
+        foreach (var item in Enum.GetValues<NotificationTypes>())
+        {
+            _toastService.ShowToast($@"<strong>Toast оповещения:</strong> Это оповещение типа {item}", item);
+        }
+    }
+
+    private Guid _lastToastId;
+
+    private async Task ToastsNotifications_ShowCustomToast(string toastText, NotificationStyles ns, NotificationTypes ntype)
+    {
+        _lastToastId = _toastService.ShowToast(new ToastSettings()
+            {
+                Content = builder => builder.AddMarkupContent(0, toastText),
+                NotificationStyle = ns,
+                Type = ntype,
+                AutoCloseInSec = _toastAutoCloseInSec,
+                ShadowEffect = _toastShadowEffect,
+                ShowCloseButton = _toastShowCloseButton,
+                ShowCloseCountdownProgress = _toastShowCountdownProgress,
+                ShowIcon = _toastShowIcon
+            });
+    }
+
+    private async Task ToastsNotifications_ShowCustomToast_Primary(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Primary);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Secondary(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Secondary);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Info(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Info);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Success(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Success);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Warning(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Warning);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Danger(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Danger);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Light(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Light);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Dark(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Dark);
+    }
+    private async Task RemoveAllToasts()
+    {
+        _toastService.ClearAll();
+    }
+    private async Task RemoveLastToasts()
+    {
+        if (_lastToastId != Guid.Empty)
+        {
+            _toastService.RemoveToast(_lastToastId);
+        }
+    }
+    #endregion
+
+    #region ALive
+
+    private HubConnection hubConnection;
+
+
+    private void CallLoadData()   
+    { 
+        string connection_string = "server = 82.146.44.138;user = mysql_c;password = 512Dcfbd28#;database=evicrm";
+
+        var contextOptions = new DbContextOptionsBuilder<Context>()
+    .UseMySql(connection_string, ServerVersion.AutoDetect(connection_string))
+    .Options;
+
+        using (var dbContext = new Context(contextOptions))
+        {
+
+            Users = dbContext.Users_Get();
+            Alexandra_Users = dbContext.AlexandraContacts_Get(user_model);
+
+        }
+        Task.Run(async () =>  
+        {  
+            await LoadData();  
+        });  
+    }  
+
+    protected async Task LoadData()
+    {
+        await ToastsNotifications_ShowCustomToast_Info("Загрузила новые сведения в пользователях!");
+    }  
+
+    public bool IsConnected =>  
+        hubConnection.State == HubConnectionState.Connected;
+
+
+    #endregion
+}
+
+
+@code {
+
+    schema_users user_model = new();
+
+    public int num { get; set; }
+
+    string user_ { get; set; }
+    string session_role { get; set; }
+    bool isAdmin { get; set; }
+
+    bool ready = false;
+
+    List<schema_users> Users = new List<schema_users>();
+    List<schema_alexandra_contacts> Alexandra_Users = new List<schema_alexandra_contacts>();
+
+    protected async override Task OnInitializedAsync()
+    {
+        user_ = authStateProvider.GetAuthenticationStateAsync().Result.User.Identity.Name;
+
+        //Получаем карточку пользователя
+
+        if (user_ != null)
+        {
+            user_model = _context.User_Get(user_);
+
+            //Проверка админки
+            if (user_model.role == "admin"
+                || user_model.role == "owner"
+                || user_model.role == "secretary")
+            {
+                isAdmin = true;
+            }
+            else
+            {
+                isAdmin = false;
+            }
+
+            //Загрузка данных
+
+            Users = _context.Users_Get();
+            Alexandra_Users = _context.AlexandraContacts_Get(user_model);
+        }
+        else
+        {
+            //syslog
+            //notify
+            return;
+        }
+
+        #region ALive
+            hubConnection = new HubConnectionBuilder()
+        .WithUrl(NavigationManager.ToAbsoluteUri("/alive"))
+        .Build();
+
+            hubConnection.On<string, string>("ReceiveMessage", (user, message) =>
+            {
+                CallLoadData();
+                StateHasChanged();
+            });
+
+            hubConnection.On<string>("ReceiveMessageDirectly", (user) =>
+            {
+                if (user == user_model.login)
+                {
+                    CallLoadData();
+                    StateHasChanged();
+                }
+            });
+            await hubConnection.StartAsync();
+            #endregion
+
+        ready = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    async Task KillContact(schema_alexandra_contacts _user)
+    {
+        _context.AlexandraContacts_Remove(_user.idalexandra_contacts);
+        uriHelper.NavigateTo("/users_grid", true);
+    }
+}

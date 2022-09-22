@@ -1,0 +1,133 @@
+﻿@*@using EviCRM.Server.Pages.Calendar.FullCalendarSource*@
+@using BlazorFullCalendar.Data;
+@using BlazorFullCalendar;
+
+<link href='https://unpkg.com/@@fullcalendar/core@@4.4.0/main.min.css' rel='stylesheet' />
+<link href='https://unpkg.com/@@fullcalendar/daygrid@@4.4.0/main.min.css' rel='stylesheet' />
+<link href='https://unpkg.com/@@fullcalendar/timegrid@@4.4.0/main.min.css' rel='stylesheet' />
+<link href='https://unpkg.com/@@fullcalendar/timeline@@4.4.0/main.min.css' rel='stylesheet' />
+<link href='https://unpkg.com/@@fullcalendar/resource-timeline@@4.4.0/main.min.css' rel='stylesheet' />
+
+
+<FullCalendar settings=@settings
+              @ref="calendar"
+              OnDrop="@AddEvent"
+              OnEventChange="@UpdateEvent"
+              OnEventClick="@ClickEvent" />
+
+@code {
+    public BlazorFullCalendar.Data.CalendarSettings settings { get; set; }
+    FullCalendar calendar;
+
+    public CalendarSourceFeed DefaultSourceFeed { get; set; }
+    public CalendarSourceFeed ProjectsSourceFeed { get; set; }
+    public CalendarSourceFeed HolidaySourceFeed { get; set; }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        var SourceFeed = new CalendarSourceFeed();
+
+
+        #region Calendar Locale Settings
+
+        var dateFormatHourMinute = new CalendarDateFormatter[] {
+            new CalendarDateFormatter
+            {
+                Hour12 = false,
+                Hour = "2-digit",
+                Minute = "2-digit",
+                Meridiem = "false"
+            }
+        };
+        var dateFormatDayMonth = new CalendarDateFormatter
+        {
+            Month = "2-digit",
+            Day = "2-digit",
+            Weekday = "short"
+        };
+
+        settings = new  BlazorFullCalendar.Data.CalendarSettings
+        {
+            Plugins = new[] { "timeGrid", "dayGrid", "interaction" },
+            InitialView = "timeGridDay",
+            HeaderToolbar  = new CalendarHeader
+            {
+                Left = "prev,next today",
+                Center = "title",
+                Right = "timeGridDay"
+            },
+
+            //refetchResourcesOnNavigate = true,
+            SlotMinTime = new CalendarDurationObject { Hour = 6 },
+            SlotMaxTime = new CalendarDurationObject { Hour = 24 },
+            EventStartEditable = true,
+            EventResizableFromStart = true,
+            EventDurationEditable = true,
+            FirstDay = 1,
+            Locale = "ru",
+            //editable = true,
+            //droppable = true,
+            //drop = "BlazorFullCalendar.interop.calendarOnDrop",
+            //eventClick = "BlazorFullCalendar.interop.calendarOnEventClick",
+            //eventDrop = "BlazorFullCalendar.interop.calendarOnEventResize",
+            //eventResize = "BlazorFullCalendar.interop.calendarOnEventResize",
+            EventTimeFormat = new CalendarEventTimeFormat 
+            { 
+                Hour = "2-digit", 
+                Minute = "2-digit", Meridiem = false 
+            },
+            Views = new Dictionary<string, CalendarViewDefinition>()
+            {
+                { 
+                    "timeGridDay", 
+                    new CalendarViewDefinition(
+                        CalendarPluginTypes.TimeGrid, 
+                        "Обзор 1 дня", 
+                        CalendarDurationObject.FromDays(1), 
+                        dateFormatHourMinute, 
+                        dateFormatDayMonth
+                    ) 
+                    { 
+                        AllDaySlot=true, 
+                        AllDayText="События"
+                    }
+                },
+            },
+            EventSources = new List<CalendarSourceFeed>()
+            {
+                DefaultSourceFeed, ProjectsSourceFeed
+            },
+        };
+
+        #endregion
+    }
+
+
+    protected async Task AddEvent(CalendarEventChangeResponse response)
+    {
+        Console.WriteLine("AddEvent callback");
+        await InvokeAsync(() => { StateHasChanged(); });
+    }
+
+    protected async Task UpdateEvent(CalendarEventChangeResponse response)
+    {
+        Console.WriteLine("UpdateEvent callback");
+        await InvokeAsync(() => { StateHasChanged(); });
+    }
+
+    protected async Task ClickEvent(CalendarEventChangeResponse response)
+    {
+        Console.WriteLine("ClickEvent callback");
+        await InvokeAsync(() => { StateHasChanged(); });
+    }
+
+    protected async Task Change(object args, string field = "")
+    {
+        Console.WriteLine("Change callback");
+        await calendar.CalendarRefetchEvents();
+        await InvokeAsync(() => { StateHasChanged(); });
+    }
+}

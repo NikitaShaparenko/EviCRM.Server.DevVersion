@@ -1,0 +1,186 @@
+@using BlazorCalendar.Core
+@using BlazorCalendar.Models
+@using EviCRM.Server.Calendar;
+
+@inject CalendarController calendarController
+@inject Context _context
+
+@inject AuthenticationStateProvider authStateProvider
+
+<link rel="stylesheet" href="css/calendar.css.css" />
+
+<div class="calendar">
+    <div class="row">
+        <div class="col-sm-12 col-lg-2">
+            <select name="" id="" class="fluent-input" @onchange="OnYearSelectChanged">
+                @for (int i = 2021; i < 2023; i++)
+                {
+                    <option "@((i == 2022 ? "selected" : ""))">@i</option>
+                }
+            </select>
+        </div>
+        <MonthSelector OnMonthSelectChanged="OnMonthSelectChanged"></MonthSelector>
+    </div>
+    <table class="calendar-table">
+        <thead>
+            <tr>
+                <td>Вс</td>
+                <td>Пн</td>
+                <td>Вт</td>
+                <td>Ср</td>
+                <td>Чт</td>
+                <td>Пт</td>
+                <td>Сб</td>
+            </tr>
+        </thead>
+        <tbody>
+            @for (int i = 0; i < CalendarController.COUNT_DAYS_IN_CALENDAR; i++)
+            {
+                <tr>
+                    @foreach (var day in days.Skip(i * 7).Take(7))
+                    {
+                        @DayTemplate(day)
+                    }
+                </tr>    
+            }
+        </tbody>
+    </table>
+</div>
+
+
+@code {
+
+    [Parameter]
+    public List<schema_calendar_schedules> sccs { get; set; }
+
+    [Parameter]
+    public RenderFragment<CalendarDay> DayTemplate {get; set;}
+
+    private int year = 2020;
+    private int month = 6;
+    private List<CalendarDay> days = new List<CalendarDay>();
+    private IEnumerable<CalendarEvent> events {get; set;}
+
+    async Task OnYearSelectChanged(ChangeEventArgs e){
+        year = Convert.ToInt32(e.Value.ToString());
+        await UpdateCalendar();
+    }
+
+    async Task OnMonthSelectChanged(ChangeEventArgs e){
+        month = Convert.ToInt32(e.Value.ToString());
+        await UpdateCalendar();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        List<CalendarEvent> ce_lst = new();
+
+        if (sccs != null)
+        {
+            if (sccs.Count > 0)
+            {
+                foreach (var elem in sccs)
+                {
+                    CalendarEvent ce = new()
+                        {
+                            Subject = elem.title,
+                            StartDate = elem.startDate,
+                            EndDate = elem.endDate,
+                            scsh = elem,
+                        };
+                    await calendarController.AddEventAsync(ce);
+                    ce_lst.Add(ce);
+                }
+            };
+        }
+
+        schema_users user_model = new();
+
+        LoadAllData();
+        await UpdateCalendar();
+
+        AddEvent.OnEventAdded += () => {
+            StateHasChanged();
+        };
+    }
+
+    string user_ { get; set; }
+    schema_users user_model = new();
+
+    public async Task LoadAllData()
+    {
+        List<schema_calendar_schedules> schel_data = new();
+        List<CalendarEvent> schel_calendar = new();
+
+
+        //Получение имени пользователя
+        user_ = authStateProvider.GetAuthenticationStateAsync().Result.User.Identity.Name;
+
+        //Получаем карточку пользователя
+
+        if (user_ != null)
+        {
+            user_model = _context.User_Get(user_);
+        }
+        else
+        {
+            return;
+        }
+
+        schel_data = _context.CalendarSchedules_Get(user_);
+        if (schel_data != null)
+        {
+            if (schel_data.Count > 0)
+            {
+                foreach (var elem in schel_data)
+                {
+                    CalendarEvent ce = new()
+                        {
+                            scsh = elem,
+                            StartDate = elem.startDate,
+                            EndDate = elem.endDate,
+                            Subject = elem.title,
+                        };
+
+                    schel_calendar.Add(ce);
+                    await calendarController.AddEventAsync(ce);
+                }
+            }
+        }
+
+        await UpdateCalendar();
+
+        AddEvent.OnEventAdded += () =>
+        {
+            StateHasChanged();
+
+            InvokeAsync(StateHasChanged);
+        };
+    }
+
+
+
+    private async Task UpdateCalendar(){
+        var events = await calendarController.GetEventsInMonthAsync(year, month);
+
+        days = calendarController.BuildMonthCalendarDays(year, month);
+        await AddEventsToCalendar(days, events);
+    }
+
+    private async Task AddEventsToCalendar(List<CalendarDay> days, IEnumerable<CalendarEvent> events){
+        if (events != null && events.Count() > 0){
+            await Task.Run(() => {
+                var nonEmptyDays = days.Where(d => !d.IsEmpty);
+
+                foreach (var nonEmptyDate in nonEmptyDays)
+                {
+                    var filteredEvents = events.Where(e => e.StartDate.Date == nonEmptyDate.Date.Date);
+                    foreach (CalendarEvent filteredEvent in filteredEvents)
+                    {
+                        nonEmptyDate.Events.Add(filteredEvent);
+                    };
+                }
+            });
+        }
+    }
+}

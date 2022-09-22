@@ -1,0 +1,325 @@
+﻿@using EviCRM.Server.Pages.Secretary
+@inject IWebHostEnvironment _env;
+@inject IHttpClientFactory ClientFactory
+
+@inject Context _context
+
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+
+    <style>
+        .action_menu_top_right {
+            position: absolute;
+            right: 0;
+            top: 0;
+        }
+
+        hr {
+    clear: both;
+    visibility: hidden;
+}
+
+        .action_menu_top_left {
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+
+        .btn-circle {
+            width: 50px;
+            height: 50px;
+            border-radius: 35px;
+            text-align: center;
+            padding-left: 0;
+            padding-right: 0;
+            font-size: 16px;
+            white-space: normal; /* восстанавливаем свойству значение по умолчанию */
+        }
+
+          .action_menu2 {
+        position: absolute;
+        right: 5px;
+        bottom: 5px;
+    }
+
+     .action_menu {
+        position: absolute;
+        right: 65px;
+        bottom: 5px;
+    }
+
+
+    </style>
+</head>
+
+@if (ready)
+{
+      <div class="card bg-info text-white-50">
+        <div class="card-body">
+            <div class="row" style="background-color:@Card.markdown_card_backcolor">
+<body>
+
+    @if (isMenuShown)
+    {
+        @if (isAdmin)
+        {
+           @* <div class="row">
+            <button type="button" class="btn btn-outline-info">Убрать обложку карточки</button>
+        </div>*@
+           }
+                        <div class="row">
+                            <button type="button" @onclick="DelegateCard" class="btn btn-outline-info">Делегировать карточку</button>
+                        </div>
+                        @if (isAdmin)
+                        {
+                             <div class="row">
+                                <button type="button" @onclick="HistoryCard" class="btn btn-outline-danger">Показать историю</button>
+        </div>
+                            <div class="row">
+                                <button type="button" @onclick="RemoveCard" class="btn btn-outline-danger">Удалить</button>
+        </div>
+        }
+    }
+
+    <hr/>
+    <hr/>
+
+    <img src="@Card.markdown_card_img_path" class="img_pos" style="width:100%; height:200px;" />
+    <button type="button" class="btn btn-light-active action_menu_top_left" @onclick="ExitCard"><font color="black"><b> x </b></font></button>
+    <button type="button" class="btn btn-light-active action_menu_top_right" @onclick="ContextMenu"><font color="black"><b> &#9776; </b></font></button>
+
+    @if (isAdmin)
+    {
+    <button type="button" class="btn btn-outline-dark action_menu_top_left_under_pic" @onclick="ContextMenu_EditCardPic"><span class="mdi mdi-clover"></span>Обложка</button>
+    }
+
+    <p></p>
+    <h5>@Card.markdown_card_name</h5>
+    <h6><b>@Card.markdown_card_name на доске </b>(<i>"@desk_name"</i>)</h6>
+    <br>
+
+    @if (isAdmin)
+                    {
+                        
+                   
+                    <h6><i>Быстрые действия</i></h6>
+    <button type="button" class="btn btn-outline-success form-control" @onclick="Card_AddMarks"><span class="mdi mdi-check-box-outline"></span>Добавить список задач</button>
+   
+    <p></p>
+
+    <textarea id="card_description" name="card_description" @bind="Card.markdown_card_description" class="form-control" placeholder="Добавить описание карточки"></textarea>
+
+                        <p></p>
+                    }
+                    else
+                    {
+                         <textarea id="card_description" name="card_description" readonly="readonly" @bind="Card.markdown_card_description" class="form-control" placeholder="Добавить описание карточки"></textarea>
+                    }
+
+    <p></p>
+
+    <h5 style="background-color:@Card.markdown_card_backcolor; color:white"> <span class="mdi mdi-clock"></span>Время выполнения</h5>
+   
+    <h6>Начало: @Card.markdown_card_date_start</h6>
+
+    @if (@Card.markdown_card_date_end < @DateTime.Now)
+    {
+         <h6><font color="red">Срок истёк:</font> @Card.markdown_card_date_end</h6>
+    }
+    else
+    {
+         <h6><font color="green">Срок окончания:</font> @Card.markdown_card_date_end</h6>
+    }
+   
+    <p></p>
+
+    <h5 style="background-color:gray; color:white"><span class="mdi mdi-file-search"></span>Список целей</h5>
+
+
+   <div><font color="black">
+                        @if (Todos != null)
+                        {
+                            if (Todos.Count > 0)
+                            {
+                                    <EditForm Model="@model">
+    <HxCheckboxList TItem="SelectData"
+    AutoSort=false
+                    TValue="string"
+                    Label=""
+                    ItemTextSelector="@(item => item.Name)"
+                    ItemValueSelector="@(item => item.Id)"
+                    Data="@markdown_todo_data"
+                    @bind-Value="@model.Todo_List"/>
+</EditForm>
+
+                            }
+                            else
+                            {
+                             <p><label>(нет добавленных дел)</label></p>
+                             }
+                        }
+                        </font>
+                        </div>
+
+    <p></p>
+    <hr/>
+                    <div class="action_menu">
+                        <button type="button" @onclick="SaveCard" class="btn btn-success btn-circle"><i class="mdi mdi-check"></i></button>
+                    </div>
+                     <div class="action_menu2">
+                        <button type="button" @onclick="ExitCard" class="btn btn-danger btn-circle"><i class="mdi mdi-close"></i></button>
+                    </div>
+
+</body>
+ 
+</div>
+</div>
+</div>
+}
+</html>
+
+@code{
+
+    bool ready = false;
+    Model model = new();
+
+    List<SelectData> markdown_todo_data { get; set; }
+
+    [Parameter]
+    public EventCallback<MarkdownCard_TwoWayDesksBindings> OnEditCard { get; set; }
+
+    [Parameter]
+    public EventCallback<MarkdownCard_TwoWayDesksBindings> OnRemoveCard { get; set; }
+
+    [Parameter]
+    public EventCallback<MarkdownCard_TwoWayDesksBindings> OnDelegateCard { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnExitCard{ get; set; } 
+
+    [Parameter]
+    public EventCallback<MarkdownCard_TwoWayDesksBindings> OnSaveCard{ get; set; }
+
+
+    public MarkdownCard_TwoWayDesksBindings mctwdb_builder()
+    {
+        MarkdownCard_TwoWayDesksBindings mctwdb = new();
+        mctwdb.Card = Card;
+
+        if (Todos != null)
+        {
+            if (Todos.Count > 0)
+            {
+                mctwdb.Todos = new();
+                foreach(var elem in Todos)
+                {
+                    elem.markdown_todo_checked = false;
+
+                    if (model.Todo_List != null)
+                    {
+                        if (model.Todo_List.Count > 0)
+                        {
+                            for (int i = 0; i<model.Todo_List.Count;i++)
+                            {
+                                if (int.Parse(model.Todo_List[i]) == elem.idmarkdown_todo_list)
+                                {
+                                    elem.markdown_todo_checked = true;
+                                }
+                                
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        mctwdb.desk_num = desk_num_id;
+        return mctwdb;
+    }
+
+    public void DelegateCard()
+    {
+        OnDelegateCard.InvokeAsync(mctwdb_builder());
+    }
+
+    public void SaveCard()
+    {
+        OnSaveCard.InvokeAsync(mctwdb_builder());
+    }
+
+    public void ExitCard()
+    {
+        OnExitCard.InvokeAsync(desk_num_id);
+    }
+
+    public void RemoveCard()
+    {
+
+        OnRemoveCard.InvokeAsync(mctwdb_builder());
+
+    }
+
+    public void HistoryCard()
+    {
+        onHistory.InvokeAsync(Card);
+    }
+
+
+    protected override void OnInitialized()
+    {
+        if (Todos != null)
+        {
+            if (Todos.Count > 0)
+            {
+                model.Todo_List = new();
+                markdown_todo_data = new();
+                foreach (var elem in Todos)
+                {
+                    SelectData sd = new();
+                    sd.Id  = elem.idmarkdown_todo_list.ToString();
+                    sd.Name = elem.markdown_todo_name;
+                    markdown_todo_data.Add(sd);
+                    if (elem.markdown_todo_checked)
+                    {
+                        model.Todo_List.Add(elem.idmarkdown_todo_list.ToString());
+                    }
+                }
+            }
+        }
+        ready = true;
+        StateHasChanged();
+    }
+    }
+
+    @code{
+    [Parameter]
+    public schema_markdown_cards Card { get; set;}
+
+    [Parameter]
+    public List<schema_markdown_todo_list> Todos { get; set;}
+
+    [Parameter]
+    public EventCallback<schema_markdown_cards> onHistory { get; set; }
+
+        [Parameter]
+        public int desk_num_id { get; set; }
+
+        [Parameter]
+        public int task_id { get; set; }
+
+        [Parameter]
+        public string desk_name { get; set; }
+
+        [Parameter]
+        public bool isAdmin { get; set; }
+}
+
+@code {
+    bool isMenuShown = false;
+
+    private class Model
+    {
+        public List<string> Todo_List { get; set; }
+    }
+}

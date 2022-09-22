@@ -1,0 +1,927 @@
+﻿@page "/news_grid"
+@using EviCRM.Server.Pages.Secretary
+@using Microsoft.AspNetCore.SignalR.Client
+
+@inject IWebHostEnvironment _env;
+@inject IToastService _toastService;
+@inject ILocalStorageService _localStorageService
+
+@inject AuthenticationStateProvider authStateProvider
+@inject NavigationManager uriHelper;
+
+@inject NavigationManager NavigationManager 
+@inject BackendController bc;
+@inject Context _context;
+@inject Sentinel sentinel;
+@inject SystemCore sc;
+
+<h5>Просмотр новости</h5>
+<PageTitle>Новости \ Просмотр</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+
+        @if (ready)
+        {
+<div class="row">
+    <div class="col-xl-9 col-lg-8">
+        <div class="card">
+            <!-- Nav tabs -->
+            <ul class="nav nav-tabs nav-tabs-custom justify-content-center pt-2" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" data-bs-toggle="tab" href="#all-post" role="tab">
+                        Все новости
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="tab" href="#archive" role="tab">
+                        Архив
+                    </a>
+                </li>
+            </ul>
+
+            <!-- Tab panes -->
+            <div class="tab-content p-4">
+                <div class="tab-pane active" id="all-post" role="tabpanel">
+                    <div>
+                        <div class="row justify-content-center">
+                            <div class="col-xl-8">
+                                <div>
+                                    <div class="row align-items-center">
+                                        <div class="col-4">
+                                            <div>
+                                                <h5 class="mb-0">Список новостей</h5>
+                                            </div>
+                                        </div>
+
+                                         <div class="col-8">
+                                            <div>
+                                                <ul class="nav nav-pills justify-content-end">
+                                                    <li class="nav-item">
+                                                        <a class="nav-link disabled" href="#" tabindex="-1" aria-disabled="true">Вид :</a>
+                                                    </li>
+                                                    <li class="nav-item" data-bs-placement="top" title="List">
+                                                        <a class="nav-link" href="/news_list">
+                                                            <i class="mdi mdi-format-list-bulleted"></i>
+                                                        </a>
+                                                    </li>
+                                                    <li class="nav-item" data-bs-placement="top" title="Grid">
+                                                        <a class="nav-link active" href="/news_grid">
+                                                            <i class="mdi mdi-view-grid-outline"></i>
+                                                        </a>
+                                                    </li>
+                                                    <li class="nav-item" data-bs-placement="top" title="Create">
+                                                        <a class="nav-link" href="/news_create">
+                                                            <i class="mdi mdi-file-plus"></i>
+                                                        </a>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- end row -->
+
+                                    <hr class="mb-4">
+
+                                     @if(isTagShow)
+                                                {
+                                                    <h5>Показаны новости с тегом: </h5>
+                                                    <i class="bx bx-purchase-tag-alt align-middle text-muted me-1"></i> @tag_shown
+                                                }
+
+                                                  @if(isCatShow)
+                                                {
+                                                    <h5>Показаны новости с категории: </h5>
+                                                    <i class="bx bx-purchase-tag-alt align-middle text-muted me-1"></i> @cat_show
+                                                }
+
+                                                @if(isSearch)
+                                                {
+                                                      <h5>Показаны новости содержащие: </h5>
+                                                    <i class="bx bx-search align-middle text-muted me-1"></i> @search_req
+                                                }
+
+    @if (News != null)
+                                                    {
+                                                        @if (News.Count > 0)
+                                                        {
+                                                            int news_count = News.Count;
+                                                                                      <div class="row">
+                                                            @for (int i = page_num * 10; i < news_count; i++)
+                                                            {
+          
+                                        <div class="col-sm-6">
+                                        
+                                                                @{
+                                                                    int temp = i;
+                                                                    }
+                                                                <div class="card p-1 border shadow-none">
+                                                                    <div class="p-3">
+                                                                        <h5><a href="javascript: void(0);" @onclick="()=>ShowNews(News[temp])" class="text-dark">@News[temp].news_head</a></h5>
+                                                                        <p class="text-muted">@DateStringFormatted(News[temp].news_added)</p>
+                                                                    </div>
+
+                                                                    <div class="position-relative">
+                                                                        <img src="@News[temp].news_title_img" alt="" class="img-thumbnail" @onclick="()=>ShowNews(News[temp])">
+                                                                    </div>
+
+                                                                    <div class="p-3">
+                                                                        <ul class="list-inline">
+                                                                            <li class="list-inline-item me-3">
+                                                                                <a href="javascript: void(0);" class="text-muted">
+                                                                                    <i class="bx bx-purchase-tag-alt align-middle text-muted me-1"></i> @CategoryParser(News[temp].news_category)
+                                                                                </a>
+                                                                            </li>
+                                                                            <li class="list-inline-item me-3">
+                                                                                <a href="javascript: void(0);" class="text-muted">
+                                                                                    <i class="bx bx-comment-dots align-middle text-muted me-1"></i> @CommentCounter(News[temp]) комментариев
+                                                                                </a>
+                                                                            </li>
+                                                                        </ul>
+                                                                        <p>@News[temp].news_title</p>
+
+                                                                        <div>
+                                                                            <a href="javascript: void(0)" @onclick="()=>ShowNews(News[temp])" class="text-primary">Читать подробнее <i class="mdi mdi-arrow-right"></i></a>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <hr class="mb-4">
+                                                         
+                                                </div>
+                                     
+                                           }  
+                                           </div>
+                                                        }
+                                                    }
+                                    <hr class="my-4">
+
+                                        <div class="text-center">
+                                        <ul class="pagination justify-content-center pagination-rounded">
+
+                                            @*Пагинация по 10 позиций*@
+
+                                            <li class="page-item disabled">
+                                                <a href="javascript: void(0);" class="page-link" @onclick="PaginationPrev"><i class="mdi mdi-chevron-left"></i></a>
+                                            </li>
+
+                                             <li class="page-item active">
+                                                <a href="javascript: void(0);" class="page-link" @onclick="()=>PaginationSelect(1)">1</a>
+                                            </li>
+
+                                            @if (News != null)
+                                            {
+                                                @if (News.Count > 0)
+                                                {
+                                                    int news_c = News.Count;
+                                                    news_pages = News.Count / 10;
+
+                                                    @if (news_pages * 10 < News.Count) //Добор последней страницы
+                                                    {
+                                                        news_pages++;
+                                                    }
+                                                }
+                                            }
+
+                                            @for(int i = 1; i<news_pages; i++)
+                                            {
+                                                 <li class="page-item active">
+                                                <a href="javascript: void(0);" class="page-link" @onclick="()=>PaginationSelect(i)">@(i++)</a>
+                                            </li>
+                                            }
+
+                                           
+                                            <li class="page-item">
+                                                <a href="javascript: void(0);" class="page-link" @onclick="PaginationNext"><i class="mdi mdi-chevron-right"></i></a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+<div class="tab-pane" id="archive" role="tabpanel">
+                    <div>
+                        <div class="row justify-content-center">
+                            <div class="col-xl-8">
+                                <h5>Архив</h5>
+                                <p></p>
+
+                        @if (News != null)
+                        {
+                            if (News.Count > 0)
+                            {
+                                List<int> unique_years = new();
+                                List<int> unique_nums = new();
+
+                                foreach(var elem in News)
+                                {
+                                    if (!unique_years.Contains(elem.news_added.Year))
+                                    {
+                                        unique_years.Add(elem.news_added.Year);
+                                    }
+                                }
+                                
+                                if (unique_years != null)
+                                {
+                                    if (unique_years.Count > 0)
+                                    {
+                                        foreach(var elem_years in unique_years)
+                                        {
+                                                    var news_by_year = News.Where(p => p.news_added.Year == elem_years).ToList();
+                                                                unique_nums.Add(news_by_year.Count);
+                                                                <div class="d-flex flex-wrap">
+                                        <div class="me-2">
+                                            <h4>@elem_years</h4>
+                                        </div>
+                                        <div class="ms-auto">
+                                            <span class="badge badge-success rounded-pill float-end ms-1 font-size-12">@news_by_year.Count</span>
+                                        </div>
+                                    </div>
+                                    <hr class="mt-2">
+
+                                    <div class="list-group list-group-flush">
+
+                                                    @if (news_by_year != null)
+                                                    {
+                                                        @foreach(var elem_by_year in news_by_year)
+                                                        {
+                                                            <a href="javascript: void(0);" @onclick="()=>ShowNews(elem_by_year)" class="list-group-item text-muted"><i class="mdi mdi-circle-medium me-1"></i>  @elem_by_year.news_head</a>
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                         <a href="javascript: void(0);" class="list-group-item text-muted"><i class="mdi mdi-circle-medium me-1"></i> Нет новостей</a>
+                                                    }
+                                                     </div>
+                                                     <p></p>
+                                         }
+                                        
+                                         <p></p>
+                                           <hr class="mb-4">
+                                        @for (int i = 0; i<unique_years.Count;i++)
+                                        {
+                                             <li><a href="javascript: void(0);" @onclick="()=>ShowArchiveYear(i)" class="text-muted py-2 d-block"><i class="mdi mdi-chevron-right me-1"></i> @unique_years[i] <span class="badge badge-success rounded-pill float-end ms-1 font-size-12">@unique_nums[i]</span></a></li>
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                            </div>
+                        </div>
+
+                        <!-- row justify-->
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-lg-4">
+        <div class="card">
+            <div class="card-body p-4">
+                <div class="search-box">
+                    <p class="text-muted">Поиск</p>
+                    <div class="position-relative">
+                        <i class="mdi mdi-magnify search-icon" @onclick="Search"></i>
+                        <input type="text" class="form-control rounded bg-light border-light" @bind="input_search" placeholder="Искать...">
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <div>
+                    <p class="text-muted">Категории</p>
+
+                    <ul class="list-unstyled fw-medium">
+                       @if (News_Cats != null)
+                        {
+                            if (News_Cats.Count > 0)
+                            {
+                                foreach(var elem in News_Cats)
+                                {
+                                    <li><a href="javascript: void(0);" @onclick="()=>ShowCat(elem.idnews_categories)" class="text-muted py-2 d-block"><i class="mdi mdi-chevron-right me-1"></i> @elem.news_cats_body </a></li>
+                                }
+                            }
+                            else
+                            {
+                                  <li><a href="javascript: void(0);" @onclick="()=>ShowCat(-1)" class="text-muted py-2 d-block"><i class="mdi mdi-chevron-right me-1"></i> Все новости </a></li>
+                            }
+                        }
+                        else
+                            {
+                                 <li><a href="javascript: void(0);" @onclick="()=>ShowCat(-1)" class="text-muted py-2 d-block"><i class="mdi mdi-chevron-right me-1"></i> Все новости </a></li>
+                            }
+                    </ul>
+                </div>
+
+                <hr class="my-4">
+
+                <div>
+                    <p class="text-muted">Архив</p>
+                     <p></p>
+                    <ul class="list-unstyled fw-medium">
+                        @if (News != null)
+                        {
+                            if (News.Count > 0)
+                            {
+                                List<int> unique_years = new();
+                                List<int> unique_nums = new();
+
+                                foreach(var elem in News)
+                                {
+                                    if (!unique_years.Contains(elem.news_added.Year))
+                                    {
+                                        unique_years.Add(elem.news_added.Year);
+                                    }
+                                }
+                                
+                                if (unique_years != null)
+                                {
+                                    if (unique_years.Count > 0)
+                                    {
+                                        foreach(var elem_years in unique_years)
+                                        {
+                                            unique_nums.Add(News.Where(p => p.news_added.Year == elem_years).Count());
+                                        }
+
+                                        for (int i = 0; i<unique_years.Count;i++)
+                                        {
+                                             <li><a href="javascript: void(0);" @onclick="()=>ShowArchiveYear(i)" class="text-muted py-2 d-block"><i class="mdi mdi-chevron-right me-1"></i> @unique_years[i] <span class="badge badge-success rounded-pill float-end ms-1 font-size-12">@unique_nums[i]</span></a></li>
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                         </ul>
+                </div>
+
+                <hr class="my-4">
+
+                <div>
+                    <p class="text-muted">Теги</p>
+
+                    <div class="d-flex flex-wrap gap-2 widget-tag">
+                        @if (News_Tags != null)
+                        {
+                            if (News_Tags.Count > 0)
+                            {
+                                foreach(var elem in News_Tags)
+                                {
+                                    <div><a href="javascript: void(0);" @onclick="()=>ShowTag(elem.idnews_tags)" class="badge bg-light font-size-12">@elem.news_tags_body</a></div>
+                                }
+                            }
+                            else
+                            {
+                                 <div><a href="javascript: void(0);" @onclick="()=>ShowTag(-1)" class="badge bg-light font-size-12">Все новости</a></div>
+                            }
+                        }
+                        else
+                            {
+                                 <div><a href="javascript: void(0);" @onclick="()=>ShowTag(-1)" class="badge bg-light font-size-12">Все новости</a></div>
+                            }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+            </div>
+        }
+        else
+        {
+            <h5><i class="bx bx-buoy bx-spin text-primary display-3"></i> Загружаю новости, ожидайте пожалуйста... </h5>
+        }
+
+    </Authorized>
+    <NotAuthorized>
+        <AuthorizationPrompt Title="Вам необходимо зарегистрироваться или войти! " />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code{
+    bool ready = false;
+
+    bool isCatShow = false;
+    bool isTagShow = false;
+    string tag_shown = "";
+    string cat_show = "";
+    bool isSearch = false;
+    string search_req = "";
+
+    //Toasts:
+
+    #region Toasts Notifications
+
+    //Toast Notifications
+    private string _toastText = $@"<strong>Toast:</strong> This is a(n) {NotificationTypes.Primary} notification";
+    private bool _toastShowIcon = true;
+    private bool _toastShowCloseButton = true;
+    private bool _toastShowCountdownProgress = true;
+    private uint _toastAutoCloseInSec = 5;
+    private uint _toastShadowEffect = 5;
+    private NotificationStyles _toastStyle;
+    private NotificationTypes _toastTypeLevel;
+
+    //Toasts
+    private async Task ToastsNotifications_ShowAllToast()
+    {
+        foreach (var item in Enum.GetValues<NotificationTypes>())
+        {
+            _toastService.ShowToast($@"<strong>Toast оповещения:</strong> Это оповещение типа {item}", item);
+        }
+    }
+
+    private Guid _lastToastId;
+
+    private async Task ToastsNotifications_ShowCustomToast(string toastText, NotificationStyles ns, NotificationTypes ntype)
+    {
+        _lastToastId = _toastService.ShowToast(new ToastSettings()
+            {
+                Content = builder => builder.AddMarkupContent(0, toastText),
+                NotificationStyle = ns,
+                Type = ntype,
+                AutoCloseInSec = _toastAutoCloseInSec,
+                ShadowEffect = _toastShadowEffect,
+                ShowCloseButton = _toastShowCloseButton,
+                ShowCloseCountdownProgress = _toastShowCountdownProgress,
+                ShowIcon = _toastShowIcon
+            });
+    }
+
+    private async Task ToastsNotifications_ShowCustomToast_Primary(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Primary);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Secondary(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Secondary);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Info(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Info);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Success(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Success);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Warning(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Warning);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Danger(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Danger);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Light(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Light);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Dark(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Dark);
+    }
+    private async Task RemoveAllToasts()
+    {
+        _toastService.ClearAll();
+    }
+    private async Task RemoveLastToasts()
+    {
+        if (_lastToastId != Guid.Empty)
+        {
+            _toastService.RemoveToast(_lastToastId);
+        }
+    }
+    #endregion
+
+    //Local Storage
+
+    #region Local Storage
+    private int _localStorageCount;
+    private IList<KeyValuePair<string, string>> _localStorageItems;
+
+    List<int> users_in_lst = new List<int>();
+    List<int> users_auth_lst = new List<int>();
+
+    private async Task InsertLocalStorageItems(string key, string val)
+    {
+        await _localStorageService.SetItemAsync(key, val);
+    }
+    private async Task RefreshLocalStorageItems()
+    {
+        _localStorageItems = new List<KeyValuePair<string, string>>();
+        await foreach (var key in _localStorageService.GetAllKeysAsync())
+        {
+            if (key is null)
+                continue;
+
+            _localStorageItems.Add(new KeyValuePair<string, string>(key, await _localStorageService.GetItemAsStringAsync(key)));
+        }
+
+    }
+    private async Task SaveCustomLocalStorageItem(string key, string val)
+    {
+        await _localStorageService.SetItemAsync(key, val);
+        await RefreshLocalStorageItems();
+    }
+    private async Task<string> GetLocalStorageItems(string key)
+    {
+        return await _localStorageService.GetItemAsStringAsync(key);
+    }
+
+    public void PaginationSelect(int new_page)
+    {
+        page_num = new_page;
+        StateHasChanged();
+    }
+
+    public void PaginationPrev()
+    {
+        if (page_num > 0)
+        {
+            page_num--;  
+        }
+
+        StateHasChanged();
+    }
+
+    public void PaginationNext()
+    {
+        if (news_pages < (page_num+ 1))
+        {
+            page_num++;
+        }
+        StateHasChanged();
+    }
+
+    public void Search()
+    {
+        if (input_search != null && input_search != "")
+        {
+            //Показать все
+            News = new();
+            if (News_Backup != null)
+            {
+                if (News_Backup.Count > 0)
+                {
+                    foreach(var elem in News_Backup)
+                    {
+                        News.Add(elem);
+                    }
+                }
+            }
+            isSearch = false;
+            search_req = "";
+        }
+        else
+        {
+            News = News_Backup.Where(p=>p.news_head.Contains(input_search)).ToList();
+            isSearch = true;
+            search_req = "Выполняется поиск по словам: " + input_search; 
+        }
+        StateHasChanged();
+    }
+
+    public void ShowCat(int cat_id)
+    {
+        if (cat_id != -1)
+        {
+            News = new();
+            if (News_Backup != null)
+            {
+                if (News_Backup.Count > 0)
+                {
+                    foreach(var elem in News_Backup)
+                    {
+                        News.Add(elem);
+                    }
+                }
+            }
+            isCatShow = false;
+            cat_show = "";
+            //Показать все
+        }
+        else
+        {
+            News = News_Backup.Where(p=>p.news_category == cat_id.ToString()).ToList();
+            isCatShow = true;
+            cat_show = getNewsCatNameById(cat_id);
+        }
+        StateHasChanged();
+    }
+
+    #endregion
+
+
+}
+@code{
+    int news_pages = 0;
+
+    schema_users Current_User = new();
+
+    List<schema_news> News = new();
+    List<schema_news_cats> News_Cats = new();
+    List<schema_news_comments> News_Comments = new();
+    List<schema_news_tags> News_Tags = new();
+
+    List<schema_news> News_Backup = new();
+
+    string user_ { get; set;}
+    bool isAdmin = false;
+
+    string input_search { get; set; }
+
+    int page_num = 0;
+    int selected_news = 0;
+
+    public string DateStringFormatted(DateTime dt)
+    {
+        string dt_string = "";
+
+        switch (dt.DayOfWeek)
+        {
+            case DayOfWeek.Monday:
+                dt_string += "пн, ";
+                break;
+
+            case DayOfWeek.Tuesday:
+                dt_string += "вт, ";
+                break;
+
+            case DayOfWeek.Wednesday:
+                dt_string += "ср, ";
+                break;
+
+            case DayOfWeek.Thursday:
+                dt_string += "чт, ";
+                break;
+
+            case DayOfWeek.Friday:
+                dt_string += "пт, ";
+                break;
+
+            case DayOfWeek.Saturday:
+                dt_string += "сб, ";
+                break;
+
+            default:
+                dt_string += "вс, ";
+                break;
+        }
+
+        dt_string += dt.ToShortDateString();
+        return dt_string;
+    }
+
+    public async Task ShowNews(schema_news news)
+    {
+        await SaveCustomLocalStorageItem("news_show",news.idnews.ToString());
+        uriHelper.NavigateTo("/news_body");
+    }
+
+    public string getNewsCatNameById(int id)
+    {
+        if (News_Comments != null)
+        {
+            if (News_Comments.Count > 0)
+            {
+                var elem = News_Cats.FirstOrDefault(p => p.idnews_categories == id);
+                if (elem != null)
+                {
+                    return elem.news_cats_body;
+                }
+            }
+        }
+        return "Нет выбранной категории";
+    }
+
+     public string getNewsTagNameById(int id)
+    {
+        if (News_Tags != null)
+        {
+            if (News_Tags.Count > 0)
+            {
+                var elem = News_Tags.FirstOrDefault(p => p.idnews_tags == id);
+                if (elem != null)
+                {
+                    return elem.news_tags_body;
+                }
+            }
+        }
+        return "Нет выбранного тега";
+    }
+
+    public string CategoryParser(string cat_id)
+    {
+        string cat = "Все задачи";
+
+        if (cat_id == "Нет категорий для выбора" || cat_id == "$null")
+        {
+            return cat; 
+        }
+
+        if (int.TryParse(cat_id,out int a))
+        {
+            if (News_Cats !=null)
+            {
+                if (News_Cats.Count > 0)
+                {
+                    foreach(var elem in News_Cats)
+                    {
+                        if (elem.idnews_categories == a)
+                        {
+                            return elem.news_cats_body;
+                        }
+                    }
+                }
+                else
+                {
+                    return cat;
+                }
+            };
+        }
+        return cat;
+    }
+
+    public void ShowTag(int tag_id)
+    {
+        if (tag_id != -1)
+        {
+            News = new();
+            if (News_Backup != null)
+            {
+                if (News_Backup.Count > 0)
+                {
+                    foreach(var elem in News_Backup)
+                    {
+                        News.Add(elem);
+                    }
+                }
+            }
+            isTagShow = false;
+            tag_shown = "";
+            //Показать все
+        }
+        else
+        {
+
+            if (News_Backup != null)
+            {
+                News = new();
+                foreach (var elem in News_Backup)
+                {
+                    List<string> tags = new();
+                    tags = bc.getMultipleStringDecodingString(elem.news_tags);
+
+                    for (int i = 0; i<tags.Count;i++)
+                    {
+                        if (tags[i] == tag_id.ToString())
+                        {
+                            News.Add(elem);
+                        }
+                    }
+
+                }
+            }
+
+            isTagShow = true;
+            tag_shown = getNewsTagNameById(tag_id);
+        }
+        StateHasChanged();
+    }
+
+    public void ShowArchiveYear(int year_date)
+    {
+
+    }
+
+    public int CommentCounter(schema_news in_news)
+    {
+        int count = 0;
+
+        int news_id = in_news.idnews;
+
+        if (News_Comments != null)
+        {
+            if (News_Comments.Count > 0)
+            {
+                return News_Comments.Where(p => p.news_id == news_id).ToList().Count;
+            }
+        }
+
+        return count;
+    }
+
+     #region ALive
+
+    private HubConnection hubConnection;
+
+
+    private void CallLoadData()   
+    { 
+        string connection_string = "server = 82.146.44.138;user = mysql_c;password = 512Dcfbd28#;database=evicrm";
+        
+        var contextOptions = new DbContextOptionsBuilder<Context>()
+    .UseMySql(connection_string, ServerVersion.AutoDetect(connection_string))
+    .Options;
+
+        using (var dbContext = new Context(contextOptions))
+        {
+       
+                    News = _context.News_Get();
+                    News_Tags = _context.News_Tags_Get();
+            News_Cats = dbContext.News_Cats_Get();
+               
+    };
+        Task.Run(async () =>  
+        {  
+            await LoadData();  
+        });  
+    }  
+
+    protected async Task LoadData()
+    {
+        await ToastsNotifications_ShowCustomToast_Info("Загрузила новые сведения в блогах!");
+    }  
+
+    public bool IsConnected =>  
+        hubConnection.State == HubConnectionState.Connected;  
+  
+   
+    #endregion
+
+    protected override async Task OnInitializedAsync()
+    {
+        user_ = authStateProvider.GetAuthenticationStateAsync().Result.User.Identity.Name;
+
+        if (user_ != null)
+        {
+
+            Current_User  = _context.User_Get(user_);
+
+            //Проверка админки
+            if (Current_User.role == "admin"
+                || Current_User.role == "owner"
+                || Current_User.role == "secretary")
+            {
+                isAdmin = true;
+            }
+            else
+            {
+                isAdmin = false;
+            }
+
+            //Загрузка данных
+
+            News = _context.News_Get();
+            News_Cats = _context.News_Cats_Get();
+            News_Comments = _context.News_Comments_Get();
+            News_Tags = _context.News_Tags_Get();
+
+            if (News != null)
+            {
+                if (News.Count > 0)
+                {
+                    foreach (var news in News)
+                    {
+                         News_Backup.Add(news);
+                    }
+                }
+            }
+
+                ready = true;
+                StateHasChanged();
+            }
+            else
+            {
+                //syslog
+                //notify
+                return;
+            }
+
+            
+        #region ALive
+            hubConnection = new HubConnectionBuilder()
+        .WithUrl(NavigationManager.ToAbsoluteUri("/alive"))
+        .Build();
+
+            hubConnection.On<string, string>("ReceiveMessage", (user, message) =>
+            {
+                CallLoadData();
+                StateHasChanged();
+            });
+
+            hubConnection.On<string>("ReceiveMessageDirectly", (user) =>
+            {
+                if (user == Current_User.login)
+                {
+                    CallLoadData();
+                    StateHasChanged();
+                }
+            });
+            await hubConnection.StartAsync();
+            #endregion
+        }
+    }

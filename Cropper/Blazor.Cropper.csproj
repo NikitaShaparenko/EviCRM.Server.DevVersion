@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net5.0</TargetFramework>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+    <PackageLicenseExpression></PackageLicenseExpression>
+    <Description>A blazor library provide a component to crop images</Description>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageProjectUrl>https://github.com/Chronostasys/Blazor.Cropper</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Chronostasys/Blazor.Cropper</RepositoryUrl>
+    <PackageTags>Blazor,Cropper,Crop,Image</PackageTags>
+    <PackageId>Chronos.Blazor.Cropper</PackageId>
+    <Version>1.2.5</Version>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DocumentationFile>.\Blazor.Cropper\Blazor.Cropper.xml</DocumentationFile>
+  </PropertyGroup>
+
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="5.0.0" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.2" />
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <None Include="..\LICENSE">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
+  </ItemGroup>
+
+</Project>

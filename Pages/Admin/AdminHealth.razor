@@ -1,0 +1,278 @@
+﻿@using EviCRM.Server.Core
+@using System.Collections.Generic;
+@using System.Net
+@using EviCRM.Server.ViewModels
+
+@page "/admin_health"
+
+@inject NavigationManager UriHelper
+@inject BackendController bc
+@inject Context _context
+@inject SystemCore sc
+@inject IWebHostEnvironment _env
+
+@using Microsoft.Extensions.Logging;
+
+<h5>Админ меню \ Состояние платформы</h5>
+<PageTitle>Админ меню \ Состояние платформы</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h4 class="card-title mb-4">Состояние платформы</h4>
+
+                        @{
+                            if (sites == null)
+                            {
+                                <b><i class="bx bx-buoy bx-spin text-primary display-3"></i> Загружаю данные...</b>
+                            }
+                            else if (sites.Count == 0)
+                            {
+                                <h5>Нет значений, нет сайтов для сканирования</h5>
+                            }
+                            else
+                            {
+                                int p = 0;
+                                p = sites.Count;
+
+                                int num = 0;
+                                int num_p = 1;
+
+                                @if (p > 0)
+                                {
+                                    <table class="table table-striped mb-0">
+
+                                        <tr>
+                                            <th>№</th>
+                                            <th>Ссылка</th>
+                                            <th>HTTP код</th>
+                                            <th>Статус</th>
+                                            <th>Действие</th>
+                                        </tr>
+
+
+                                        @foreach (var ahm in sites)
+                                        {
+                                            <tr>
+                                                <td>@num_p</td>
+                                                @{
+                                                    int inum = num;
+                                                }
+                                                <td>@ahm.link</td>
+                                                <td>@ahm.httpcode</td>
+                                                <td>@ahm.status</td>
+
+                                                <td>
+                                                    <button class="btn btn-outline-danger" @onclick="@(async () => await KillLink(ahm))">Удалить</button>
+                                                </td>
+                                            </tr>
+
+
+                                            num++;
+                                            num_p++;
+
+                                        }
+                                    </table>
+                                }
+                            }
+                        }
+
+                        <p></p>
+                    </div>
+                </div>
+            </div>
+
+            <p>
+                <div class="form-group row mb-4">
+                    <label for="taskname" class="col-form-label col-lg-2">Добавить ссылку для мониторинга:</label>
+                    <div class="col-lg-10">
+                        <input id="taskname" @bind=@link_add name="link" type="text" asp-for="link" class="form-control" placeholder="Новая ссылка для мониторинга">
+                    </div>
+
+                </div>
+                <button type="button" @onclick=@(async () => await AddLink()) class="btn btn-primary">Добавить новую ссылку</button>
+            </p>
+
+
+
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <AuthorizationPrompt Title="Вам необходимо зарегистрироваться или войти! " />
+    </NotAuthorized>
+</AuthorizeView>
+
+@functions {
+
+    public async Task AddLink()
+    {
+        schema_a_health sch = new()
+            {
+                link = link_add,
+                status = "В обработке",
+                httpcode = "102"
+            };
+
+        _context.AHealth_Create(sch);
+
+        sc.Log("AdminHealth", "Успешно добавлена новая ссылка для мониторинга = " + link_add, SystemCore.LogLevels.Info);
+
+        this.StateHasChanged();
+        //UriHelper.NavigateTo("/admin_health", true);
+    }
+
+        }
+
+@functions
+{
+
+}
+
+@code {
+
+    List<schema_a_health> sites = new();
+
+    int num = 0;
+    private string link_add = "";
+
+    protected async override Task OnInitializedAsync()
+    {
+        sites = _context.AHealth_Get();
+
+        if (sites != null)
+        {
+            Thread[] thread = new Thread[sites.Count];
+            for (int i = 0; i < sites.Count; i++)
+            {
+                thread[i] = new Thread(() => getHTTPCode(i));
+                thread[i].Start();
+                Thread.Sleep(50);
+            }
+
+
+        }
+    }
+
+    public int getHTTPCode2(string link)
+    {
+        var builder = new UriBuilder(link);
+        var uri = builder.Uri;
+        try
+        {
+            HttpWebRequest webRequest = (HttpWebRequest)WebRequest.Create(uri);
+            webRequest.Timeout = 1000;
+            var response = (HttpWebResponse)webRequest.GetResponse();
+            // This will have statii from 200 to 30x
+            return (int)response.StatusCode;
+        }
+        catch (WebException we) when (we.Response is HttpWebResponse response)
+        {
+            // Statii 400 to 50x will be here
+            if (int.TryParse(response.StatusCode.ToString(), out int a))
+            {
+                return int.Parse(response.StatusCode.ToString());
+            }
+            else
+            {
+                return 200;
+            }
+        }
+        catch (Exception ex)
+        {
+            return int.Parse("405");
+        }
+    }
+
+    public async Task KillLink(schema_a_health sch)
+    {
+        _context.AHealth_Remove(sch.idhealth);
+        UriHelper.NavigateTo("/admin_health", true);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public string getHTTPCodeDescription(int http_code)
+    {
+        switch (http_code)
+        {
+            case 102:
+                return "[Инфо] В процессе выполнения...";
+            case 200:
+                return "[Успех] Всё в порядке!";
+            case 301:
+                return "[Успех] Файл перемещён, используется переадрессация";
+            case 404:
+                return "[ОШИБКА] Файл не найден!";
+            case 405:
+                return "[ОШИБКА] Метод не поддерживается!";
+            case 500:
+                return "[ОШИБКА] Критическая ошибка сервера";
+            case 403:
+                return "[ОШИБКА] Ошибка доступа, доступ к данной папке каким-либо образом ограничен";
+            case 502:
+                return "[ОШИБКА] Сервер не может обработать запрос и не знает что ответить";
+            default:
+                return "[Инфо] Не знаю такого кода";
+        }
+
+    }
+
+
+    public void getHTTPCode(int num)
+    {
+
+        if (sites.Count <= num)
+        {
+            return;
+        }
+
+        var builder = new UriBuilder(sites[num].link);
+        var uri = builder.Uri;
+        try
+        {
+            HttpWebRequest webRequest = (HttpWebRequest)WebRequest.Create(uri);
+            webRequest.Timeout = 2000;
+            webRequest.AllowAutoRedirect = true;
+            var response = (HttpWebResponse)webRequest.GetResponse();
+            // This will have statii from 200 to 30x
+            sites[num].httpcode = ((int)response.StatusCode).ToString();
+        }
+        catch (WebException we) when (we.Response is HttpWebResponse response)
+        {
+            // Statii 400 to 50x will be here
+            if (int.TryParse(response.StatusCode.ToString(), out int a))
+            {
+                sites[num].httpcode = ((int)response.StatusCode).ToString();
+            }
+            else
+            {
+                sites[num].httpcode = "200";
+            }
+        }
+         catch(WebException ex2)
+         {
+            if(ex2.Message.Contains("302"))
+                sites[num].httpcode = "302";
+        }
+        catch (Exception ex)
+        {
+            sites[num].httpcode = "405";
+        }
+        
+         if (int.TryParse(sites[num].httpcode, out int b))
+            {
+                 sites[num].status = getHTTPCodeDescription(int.Parse(sites[num].httpcode));
+            }
+            else
+            {
+                sites[num].httpcode = "502";
+            }
+
+        InvokeAsync(StateHasChanged);
+    }
+
+
+}

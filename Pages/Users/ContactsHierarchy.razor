@@ -1,0 +1,194 @@
+﻿@page "/users_hierarchy"
+@using EviCRM.Server.Core
+@using EviCRM.Server.ViewModels
+
+@inject AuthenticationStateProvider authStateProvider
+
+@inject BackendController bc
+@inject Context _context
+@inject SystemCore sc
+@inject Sentinel sentinel
+
+<PageTitle>Отделы</PageTitle>
+<h5>Отделы</h5>
+
+<style>
+    /* Кнопки стиля */
+    .btn-link {
+        /*background-color: DodgerBlue;*/ /* Синий фон */
+        background-color: lightskyblue;
+        border: none; /* Удалить границы */
+        color: white; /* Белый текст */
+        padding: 12px 16px; /* Немного отступов */
+        font-size: 16px; /* Установите размер шрифта */
+        cursor: pointer; /* Указатель мыши при наведении */
+    }
+
+        /* Более темный фон при наведении курсора мыши */
+        .btn-link:hover {
+            background-color: RoyalBlue;
+        }
+</style>
+
+@inject NavigationManager uriHelper;
+
+<AuthorizeView>
+    <Authorized>
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table align-middle table-nowrap table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th scope="col" style="width: 70px;">#</th>
+                                        <th scope="col">Название отдела</th>
+                                        <th scope="col">Начальник отдела</th>
+                                        <th scope="col">Состав</th>
+                                        @if (isAdmin)
+                                        {
+                                            <th scope="col">Действие</th>
+                                        }
+
+                                    </tr>
+                                </thead>
+
+                                @if (ready)
+                                {
+
+                                    <tbody>
+                                        @if (Divisions.Count > 0)
+                                        {
+                                            int i = 0;
+                                            foreach(var elem in Divisions)
+                                            {
+                                                i++;
+                                                <tr>
+                                                    <ContactsHierarchy_Component 
+                                                    div=@elem
+                                                    
+                                                    cnt=@i
+                                                    isAdmin=@isAdmin 
+                                                    users=@Users
+                                                    
+                                                    OnKill="KillInterpreter" 
+                                                    OnSave="SaveInterpreter" />
+                                                </tr>
+                                            }
+                                        }
+
+
+                                    </tbody>
+                                }
+                            </table>
+
+                            <button type="button" class="btn btn-primary" @onclick="CreateDiv">Создать отдел</button>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <AuthorizationPrompt Title="Вам необходимо зарегистрироваться или войти! " />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+
+
+    string cast = "";
+
+    bool ready { get; set; }
+
+    List<string> cast_list = new List<string>();
+    List<string> cast_list_formatted = new List<string>();
+    List<string> cast_selected = new List<string>();
+    List<string> cast_selected_formatted = new List<string>();
+    List<string> without_cast_clearned = new List<string>();
+    List<string> without_cast_clearned_formatted = new List<string>();
+
+    List<schema_users> Users = new List<schema_users>();
+    List<schema_divisions> Divisions = new List<schema_divisions>();
+
+    bool isAdmin { get; set; }
+
+    string form_bypass_id = "0";
+    string form_bypass_name = "";
+    string[] form_bypass_cast;
+    string form_responsible = "";
+
+    int current_division_selected = 0;
+    string user_{ get; set; }
+
+    async Task SaveInterpreter(schema_divisions div)
+    {
+        _context.Division_Update(div);
+        uriHelper.NavigateTo("/users_hierarchy", true);
+    }
+
+    async Task CreateDiv()
+    {
+        schema_divisions new_div = new()
+            {
+                division_name = "Отдел без названия от " + DateTime.Now.ToShortDateString() + " " + DateTime.Now.ToLongTimeString(),
+                division_responsible = user_,
+                division_cast = user_,
+                
+            };
+
+        _context.Division_Create(new_div);
+        uriHelper.NavigateTo("/users_hierarchy", true);
+        ready = true;
+        StateHasChanged();
+
+    }
+
+    async void KillInterpreter(schema_divisions div)
+    {
+        _context.Division_Remove(div.id);
+        uriHelper.NavigateTo("/users_hierarchy", true);
+    }
+
+    protected async override Task OnInitializedAsync()
+    {
+        ready = false;
+        user_ = authStateProvider.GetAuthenticationStateAsync().Result.User.Identity.Name;
+
+        //Получаем карточку пользователя
+
+        if (user_ != null)
+        {
+            var user_model = _context.User_Get(user_);
+
+            //Проверка админки
+            if (user_model.role == "admin" 
+                || user_model.role=="owner"
+                || user_model.role =="secretary")
+            {
+                isAdmin = true;
+            }
+            else
+            {
+                isAdmin = false;
+            }
+
+            //Загрузка данных
+
+            Users = _context.Users_Get();
+            Divisions = _context.Divisions_Get();
+        }
+        else
+        {
+            //syslog
+            //notify
+            return;
+        }
+
+
+        ready = true;
+        await InvokeAsync(StateHasChanged);
+    }
+}

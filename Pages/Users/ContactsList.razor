@@ -1,0 +1,347 @@
+﻿@using EviCRM.Server.Core;
+@using Microsoft.AspNetCore.SignalR.Client
+
+@page "/users_list"
+
+<PageTitle>Пользователи \ Списком</PageTitle>
+<h5>Пользователи \ Списком</h5>
+
+@inject NavigationManager uriHelper;
+@inject AuthenticationStateProvider authStateProvider
+
+@inject BackendController bc
+@inject Context _context
+@inject SystemCore sc
+@inject Sentinel sentinel
+
+@inject IToastService _toastService
+
+<style>
+    /* Кнопки стиля */
+    .btn-link {
+        /*background-color: DodgerBlue;*/ /* Синий фон */
+        background-color: lightskyblue;
+        border: none; /* Удалить границы */
+        color: white; /* Белый текст */
+        padding: 12px 16px; /* Немного отступов */
+        font-size: 16px; /* Установите размер шрифта */
+        cursor: pointer; /* Указатель мыши при наведении */
+    }
+
+        /* Более темный фон при наведении курсора мыши */
+        .btn-link:hover {
+            background-color: RoyalBlue;
+        }
+</style>
+<AuthorizeView>
+    <Authorized>
+
+        @if (ready == false)
+        {
+            <p><i class="bx bx-buoy bx-spin text-primary display-3"></i><i> Нужно немного времени, чтобы загрузить эту страницу</i></p>
+            <p><i>Пожалуйста подождите...</i></p>
+        }
+        else
+        {
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table align-middle table-wrap table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th scope="col" style="width: 70px;">#</th>
+                                            <th scope="col">Имя</th>
+                                            <th scope="col">Электронная почта</th>
+                                            <th scope="col">Навыки</th>
+                                            <th scope="col">Действия</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (Users.Count > 0)
+                                        {
+                                            foreach(var elem in Users)
+                                       {
+                                        <ContactsList_User user=@elem />
+                                         }
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h6>Контакты, которые передала Александра</h6>
+
+                    @if (Alexandra_Users != null)
+                    {
+                        <div class="row">
+                            <div class="col-lg-12">
+                                <div class="card">
+                                    <div class="card-body">
+
+                                        <div class="table-responsive">
+                                            <table class="table align-middle table-wrap table-hover">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th scope="col" style="width: 70px;">#</th>
+                                                        <th scope="col">Имя</th>
+                                                        <th scope="col">Телефонный номер</th>
+                                                        <th scope="col">Телеграм</th>
+                                                        <th scope="col">Удалить</th>
+                                                    </tr>
+                                                </thead>
+
+                                                <tbody>
+
+                                                    @foreach(var elem in Alexandra_Users)
+                                                    {
+                                                        <tr>
+                                                            <td>
+                                                                <div class="avatar-xs">
+                                                                    <span class="avatar-title rounded-circle">
+                                                                        @{
+                                                                            string str = elem.firstname.ToUpper();
+                                                                            char b_str = '?';
+                                                                            if (str.Length > 0)
+                                                                            {
+                                                                                b_str = str[0];
+                                                                            }
+                                                                            @b_str
+                                                                        }
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+
+                                                            <td>
+                                                                @(elem.firstname + " " + elem.lastname)
+                                                            </td>
+
+                                                            <td>
+                                                                <a href="tel:@elem.phonenumber">@elem.phonenumber</a>
+                                                            </td>
+
+                                                            <td>
+
+                                                                @if (elem.userId != null && elem.userId != "")
+                                                                {
+                                                                    <a class="btn btn-primary btn-link" href="https://tgrm.github.io/@elem.userId" role="button"><i class="fab fa-telegram-plane ms-1"></i></a>
+
+                                                                }
+                                                                else
+                                                                {
+                                                                    @("Нет в Телеграмме")
+                                                                }
+                                                            </td>
+                                                            <td>
+                                                               
+                                                                <button type="button" class="btn btn-danger" @onclick="async()=> await KillContact(elem)"><i class="fas fa-times ms-1"></i></button>
+
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+    </Authorized>
+    <NotAuthorized>
+        <AuthorizationPrompt Title="Вам необходимо зарегистрироваться или войти! " />
+    </NotAuthorized>
+</AuthorizeView>
+@code{
+ //Toasts:
+
+    #region Toasts Notifications
+
+     //Toast Notifications
+        private string _toastText = $@"<strong>Toast:</strong> This is a(n) {NotificationTypes.Primary} notification";
+	    private bool _toastShowIcon = true;
+	    private bool _toastShowCloseButton = true;
+	    private bool _toastShowCountdownProgress = true;
+	    private uint _toastAutoCloseInSec = 5;
+	    private uint _toastShadowEffect = 5;
+	    private NotificationStyles _toastStyle;
+	    private NotificationTypes _toastTypeLevel;
+
+    //Toasts
+    private async Task ToastsNotifications_ShowAllToast()
+    {
+        foreach (var item in Enum.GetValues<NotificationTypes>())
+        {
+            _toastService.ShowToast($@"<strong>Toast оповещения:</strong> Это оповещение типа {item}", item);
+        }
+    }
+
+    private Guid _lastToastId;
+
+    private async Task ToastsNotifications_ShowCustomToast(string toastText, NotificationStyles ns, NotificationTypes ntype)
+    {
+        _lastToastId = _toastService.ShowToast(new ToastSettings()
+            {
+                Content = builder => builder.AddMarkupContent(0, toastText),
+                NotificationStyle = ns,
+                Type = ntype,
+                AutoCloseInSec = _toastAutoCloseInSec,
+                ShadowEffect = _toastShadowEffect,
+                ShowCloseButton = _toastShowCloseButton,
+                ShowCloseCountdownProgress = _toastShowCountdownProgress,
+                ShowIcon = _toastShowIcon
+            });
+    }
+
+    private async Task ToastsNotifications_ShowCustomToast_Primary(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Primary);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Secondary(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Secondary);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Info(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Info);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Success(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Success);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Warning(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Warning);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Danger(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Danger);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Light(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Light);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Dark(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Dark);
+    }
+    private async Task RemoveAllToasts()
+    {
+        _toastService.ClearAll();
+    }
+    private async Task RemoveLastToasts()
+    {
+        if (_lastToastId != Guid.Empty)
+        {
+            _toastService.RemoveToast(_lastToastId);
+        }
+    }
+    #endregion
+}
+
+@code{
+
+    #region ALive
+
+    private HubConnection hubConnection;
+
+
+    private void CallLoadData()   
+    { 
+        string connection_string = "server = 82.146.44.138;user = mysql_c;password = 512Dcfbd28#;database=evicrm";
+        
+        var contextOptions = new DbContextOptionsBuilder<Context>()
+    .UseMySql(connection_string, ServerVersion.AutoDetect(connection_string))
+    .Options;
+
+        using (var dbContext = new Context(contextOptions))
+        {
+             Users = dbContext.Users_Get();
+            Alexandra_Users = dbContext.AlexandraContacts_Get(user_model);
+    }
+        Task.Run(async () =>  
+        {  
+            await LoadData();  
+        });  
+    }  
+
+    protected async Task LoadData()
+    {
+        await ToastsNotifications_ShowCustomToast_Info("Загрузила новые сведения в пользователях!");
+    }  
+
+    public bool IsConnected =>  
+        hubConnection.State == HubConnectionState.Connected;  
+  
+   
+    #endregion
+}
+
+@code {
+
+
+    public int num { get; set; }
+
+    string user_ { get; set; }
+    string session_role { get; set; }
+    bool isAdmin { get; set; }
+
+    bool ready = false;
+
+    List<schema_users> Users = new List<schema_users>();
+    List<schema_alexandra_contacts> Alexandra_Users = new List<schema_alexandra_contacts>();
+    schema_users user_model = new();
+
+    protected async override Task OnInitializedAsync()
+    {
+
+        user_ = authStateProvider.GetAuthenticationStateAsync().Result.User.Identity.Name;
+
+        //Получаем карточку пользователя
+
+        if (user_ != null)
+        {
+            user_model = _context.User_Get(user_);
+
+            //Проверка админки
+            if (user_model.role == "admin" 
+                || user_model.role=="owner"
+                || user_model.role =="secretary")
+            {
+                isAdmin = true;
+            }
+            else
+            {
+                isAdmin = false;
+            }
+
+            //Загрузка данных
+
+            Users = _context.Users_Get();
+            Alexandra_Users = _context.AlexandraContacts_Get(user_model);
+        }
+        else
+        {
+            //syslog
+            //notify
+            return;
+        }
+
+        ready = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    async Task KillContact(schema_alexandra_contacts _user)
+    {
+        _context.AlexandraContacts_Remove(_user.idalexandra_contacts);
+        uriHelper.NavigateTo("/users_list", true);
+    }
+
+}

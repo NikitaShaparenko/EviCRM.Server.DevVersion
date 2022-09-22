@@ -1,0 +1,697 @@
+﻿@inject NavigationManager NavigationManager  
+@using Microsoft.AspNetCore.SignalR.Client
+@inject IToastService _toastService
+
+@using EviCRM.Server.Pages.Secretary
+@if (ready)
+{
+    //Загрузка существующих досок
+    @if (Markdown_Desks != null)
+    {
+        @if (Markdown_Desks.Count > 0)
+        {
+
+            for (int i = 0; i < Markdown_Desks.Count; i++)
+            {
+                //Количество досок
+
+                if (screen_actions_lst[i] == ScreenActions.Desk_Main)
+                {
+
+                    if (Markdown_Desks[i].markdown_desk_personal_id == User.id)
+                    {
+                        <div class="col-lg-4">
+                            <Markdown_Desks desk_title_name=@("Доска моих задач : " + @Markdown_Desks[i].markdown_desk_name)
+                    markdown_cards=getMDCardsByDesk(Markdown_Desks[i])
+                    markdown_desk=Markdown_Desks[i]
+                    desk_num=i
+                    OnCopyingCard=ev_desk_CopyCard
+                    OnCreateCard=ev_desk_CreateCard
+                    OnSorting=ev_desk_Sorting
+                    OnCreateDesk=ev_desk_CreateDesk
+                    OnMovingCard=ev_desk_MovingCard 
+                    OnSelectCard=ev_desk_CardSelected
+
+                     OnDelegateDesk=ev_desk_DeskDelegated
+                    OnDelegateCard=ev_desk_CardDelegated
+                    />
+                        </div>
+                    }
+                    else if (Markdown_Desks[i].markdown_desk_personal_id == null || Markdown_Desks[i].markdown_desk_personal_id == -1)
+                    {
+                        <div class="col-lg-4">
+                            <Markdown_Desks desk_title_name=@("Доска общих задач : " + @Markdown_Desks[i].markdown_desk_name)
+                    markdown_cards=getMDCardsByDesk(Markdown_Desks[i])
+                    markdown_desk=Markdown_Desks[i]
+                    desk_num=i
+                    OnCopyingCard=ev_desk_CopyCard
+                    OnCreateCard=ev_desk_CreateCard
+                    OnSorting=ev_desk_Sorting
+                    OnCreateDesk=ev_desk_CreateDesk
+                    OnMovingCard=ev_desk_MovingCard
+                    OnSelectCard=ev_desk_CardSelected
+                    
+                    OnDelegateDesk=ev_desk_DeskDelegated
+                    OnDelegateCard=ev_desk_CardDelegated
+                    
+                    />
+                        </div>
+                    }
+                    else if (isAdmin)
+                    {
+                        <div class="col-lg-4">
+                            <Markdown_Desks desk_title_name=@("Доска задач " + @User.fullname + " : " + @Markdown_Desks[i].markdown_desk_name)
+                    markdown_cards=getMDCardsByDesk(Markdown_Desks[i])
+                    markdown_desk=Markdown_Desks[i]
+                    desk_num=i
+                    OnCopyingCard=ev_desk_CopyCard
+                    OnCreateCard=ev_desk_CreateCard
+                    OnSorting=ev_desk_Sorting
+                    OnCreateDesk=ev_desk_CreateDesk
+                    OnMovingCard=ev_desk_MovingCard
+                    OnSelectCard=ev_desk_CardSelected
+                    
+                    OnDelegateDesk=ev_desk_DeskDelegated
+                    OnDelegateCard=ev_desk_CardDelegated
+                    
+                    />
+                        </div>
+                    }
+                }
+                else if (screen_actions_lst[i] == ScreenActions.Desk_Create)
+                {
+                    <div class="col-lg-4">
+                        <Markdown_AddDesk 
+                        
+                        OnCardExit=DeskCreatedExit
+                        OnDeskCreated=DeskCreatedInterpeter
+                        OnDeskErrorCreating=DeskErrorCreatingInterpreter
+                        
+                        task_id=task_id
+                        desk_num_id=i 
+                       
+                        select_data_users=sd_users
+                        />
+                    </div>
+                }
+                else if (screen_actions_lst[i] == ScreenActions.Card_Create)
+                {
+                    <div class="col-lg-4">
+                        <Markdown_AddCard 
+                        markdown_card=CardCreatedInterpeter
+                        desk_id_num=i
+                        Desk=desk_to_view
+                        task_id=task_id
+                        error_markdown_card=CardErrorInterpeter
+                        OnClosePage=CreateCardClosed
+                      />
+                    </div>
+                }
+                else if (screen_actions_lst[i] == ScreenActions.Card_View)
+                {
+                    <div class="col-lg-4">
+                        <Markdown_Card 
+                        Card=card_to_view
+                        Todos=todos_to_view
+
+                        desk_num_id=i
+                        task_id=task_id
+                        onHistory=doHistory
+                        desk_name=@getDeskNameByCard()
+                        isAdmin=isAdmin
+                        
+                        OnDelegateCard=MarkdownCard_DelegateHandler
+                        OnEditCard=MarkdownCard_EditHandler
+                        OnExitCard=MarkdownCard_ExitHandler
+                        OnRemoveCard=MarkdownCard_RemoveHandler
+                        OnSaveCard=MarkdownCard_SaveHandler
+                        />
+                    </div>
+                }
+                else if (screen_actions_lst[i]==ScreenActions.Card_Edit)
+                {
+                    <div class="col-lg-4">
+                            <Markdown_AddCard 
+                            markdown_edit=CardUpdatedInterpeter
+                        markdown_card=CardCreatedInterpeter
+                        desk_id_num=i
+                        isEditor=true
+                        edit_card=card_to_view
+                        Desk=desk_to_view
+                        task_id=task_id
+                        error_markdown_card=CardErrorInterpeter
+                        OnClosePage=CreateCardClosed
+
+                      />
+                    </div>
+                }
+                else if (screen_actions_lst[i]==ScreenActions.Card_Delegate)
+                {
+                    <div class="col-lg-4">
+                    <Markdown_DelegateCard 
+                    Desks=Markdown_Desks
+                    Users=Users
+                    desk_num_id=i
+                    Card=card_to_view
+                    Current_User=User
+                    ErrorShow=ToastDangerGenerator
+                    OnExit=OnDelegateCardExit
+                    OnSave=OnDelegateCardSave
+                    
+                    />
+                    </div>
+                }
+                  else if (screen_actions_lst[i]==ScreenActions.Desk_Delegate)
+                {
+                    <div class="col-lg-4">
+                    <Markdown_DelegateDesk
+                    Current_User=User
+                    Desk=desk_to_view
+                    desk_num_id=i
+                    ErrorShow=ToastDangerGenerator
+                    OnExit=OnDelegateDeskExit
+                    OnSave=OnDelegateDeskSave
+                    Users=Users
+
+                    />
+                    </div>
+                }
+            }
+        }
+
+    }
+
+    //Если не была ещё создана персональная доска
+
+}
+
+@code{
+     //Toasts:
+
+    #region Toasts Notifications
+
+     //Toast Notifications
+        private string _toastText = $@"<strong>Toast:</strong> This is a(n) {NotificationTypes.Primary} notification";
+	    private bool _toastShowIcon = true;
+	    private bool _toastShowCloseButton = true;
+	    private bool _toastShowCountdownProgress = true;
+	    private uint _toastAutoCloseInSec = 5;
+	    private uint _toastShadowEffect = 5;
+	    private NotificationStyles _toastStyle;
+	    private NotificationTypes _toastTypeLevel;
+
+    //Toasts
+    private async Task ToastsNotifications_ShowAllToast()
+    {
+        foreach (var item in Enum.GetValues<NotificationTypes>())
+        {
+            _toastService.ShowToast($@"<strong>Toast оповещения:</strong> Это оповещение типа {item}", item);
+        }
+    }
+
+    private Guid _lastToastId;
+
+    private async Task ToastsNotifications_ShowCustomToast(string toastText, NotificationStyles ns, NotificationTypes ntype)
+    {
+        _lastToastId = _toastService.ShowToast(new ToastSettings()
+            {
+                Content = builder => builder.AddMarkupContent(0, toastText),
+                NotificationStyle = ns,
+                Type = ntype,
+                AutoCloseInSec = _toastAutoCloseInSec,
+                ShadowEffect = _toastShadowEffect,
+                ShowCloseButton = _toastShowCloseButton,
+                ShowCloseCountdownProgress = _toastShowCountdownProgress,
+                ShowIcon = _toastShowIcon
+            });
+    }
+
+    private async Task ToastsNotifications_ShowCustomToast_Primary(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Primary);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Secondary(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Secondary);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Info(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Info);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Success(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Success);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Warning(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Warning);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Danger(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Danger);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Light(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Light);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Dark(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Dark);
+    }
+    private async Task RemoveAllToasts()
+    {
+        _toastService.ClearAll();
+    }
+    private async Task RemoveLastToasts()
+    {
+        if (_lastToastId != Guid.Empty)
+        {
+            _toastService.RemoveToast(_lastToastId);
+        }
+    }
+    #endregion
+}
+
+@code{
+
+    #region ALive
+
+    private HubConnection hubConnection;
+
+
+    private void CallLoadData()   
+    { 
+        string connection_string = "server = 82.146.44.138;user = mysql_c;password = 512Dcfbd28#;database=evicrm";
+        
+        var contextOptions = new DbContextOptionsBuilder<Context>()
+    .UseMySql(connection_string, ServerVersion.AutoDetect(connection_string))
+    .Options;
+
+        using (var dbContext = new Context(contextOptions))
+        {
+
+    }
+        Task.Run(async () =>  
+        {  
+            await LoadData();  
+        });  
+    }  
+
+    protected async Task LoadData()
+    {
+        await ToastsNotifications_ShowCustomToast_Info("Загрузила новые сведения в задачник!");
+    }  
+
+    public bool IsConnected =>  
+        hubConnection.State == HubConnectionState.Connected;  
+  
+   
+    #endregion
+}
+
+@code{
+
+    public string getDeskNameByCard()
+    {
+        if (card_to_view != null)
+        {
+            int desk_id = card_to_view.markdown_card_deskid;
+
+            if (Markdown_Desks != null)
+            {
+                if (Markdown_Desks.Count > 0)
+                {
+                    var elem =Markdown_Desks.FirstOrDefault(p=>p.idmarkdown_desks == desk_id);
+                    if (elem != null)
+                    {
+                        return elem.markdown_desk_name;
+                    }
+
+                }
+            }
+        }
+        return "Неизвестная доска";
+    }
+
+    public void DeskCreatedExit(int num)
+    {
+        screen_actions_lst[num] = ScreenActions.Desk_Main;
+        StateHasChanged();
+    }
+
+    public void ev_desk_CardDelegated(MarkdownCard_TwoWayDesksBindings mctwdb)
+    {
+        MarkdownCard_DelegateHandler(mctwdb);
+    }
+
+    public void ev_desk_DeskDelegated(Markdown_TwoWayDesksBindings mtdb)
+    {
+        screen_actions_lst[mtdb.desk_num] = ScreenActions.Desk_Delegate;
+        desk_to_view = mtdb.Desk;
+        StateHasChanged();
+    }
+
+
+    public void OnDelegateDeskSave(Markdown_TwoWayDesksBindings mtdb)
+    {
+        doUpdateDesk.InvokeAsync(mtdb.Desk);
+        doDelegateDesk.InvokeAsync(mtdb);
+        screen_actions_lst[mtdb.desk_num] = ScreenActions.Desk_Main;
+        StateHasChanged();
+    }
+
+    public void OnDelegateCardSave(MarkdownCard_TwoWayDesksBindings mctwdb)
+    {
+        doUpdateCard.InvokeAsync(mctwdb.Card);
+        doDelegateCard.InvokeAsync(mctwdb);
+        screen_actions_lst[mctwdb.desk_num] = ScreenActions.Desk_Main;
+        StateHasChanged();
+    }
+
+    public void OnDelegateCardExit(int num)
+    {
+         screen_actions_lst[num] = ScreenActions.Desk_Main;
+        StateHasChanged();
+    }
+
+    public void OnDelegateDeskExit(int num)
+    {
+         screen_actions_lst[num] = ScreenActions.Desk_Main;
+        StateHasChanged();
+    }
+}
+
+@code{
+
+
+    public void ToastDangerGenerator(string text)
+    {
+        ToastNotification tn = new(text, ToastNotification.ToastsTypes.Danger);
+        OnToastHandler.InvokeAsync(tn);
+    }
+
+    public void MarkdownCard_ExitHandler(int desk)
+    {
+        screen_actions_lst[desk] = ScreenActions.Desk_Main;
+        StateHasChanged();
+    }
+
+    public void MarkdownCard_EditHandler(MarkdownCard_TwoWayDesksBindings mctwdb)
+    {
+        screen_actions_lst[mctwdb.desk_num] = ScreenActions.Card_Edit;
+
+        StateHasChanged();
+    }
+
+    public void MarkdownCard_DelegateHandler(MarkdownCard_TwoWayDesksBindings mctwdb)
+    {
+        screen_actions_lst[mctwdb.desk_num] = ScreenActions.Card_Delegate;
+        card_to_view = mctwdb.Card;
+        StateHasChanged();
+    }
+
+    public void MarkdownCard_RemoveHandler(MarkdownCard_TwoWayDesksBindings mctwdb)
+    {
+        screen_actions_lst[mctwdb.desk_num] = ScreenActions.Desk_Main;
+       doRemoveCard.InvokeAsync(mctwdb);
+        StateHasChanged();
+    }
+
+      public void MarkdownCard_SaveHandler(MarkdownCard_TwoWayDesksBindings mctwdb)
+    {
+        screen_actions_lst[mctwdb.desk_num] = ScreenActions.Desk_Main;
+        StateHasChanged();
+    }
+}
+
+@code{
+
+    [Parameter]
+    public EventCallback<MarkdownCard_TwoWayDesksBindings> doDelegateCard {get;set;}
+
+    [Parameter]
+    public EventCallback<Markdown_TwoWayDesksBindings> doDelegateDesk { get; set; }
+
+    [Parameter]
+    public EventCallback<MarkdownCard_TwoWayDesksBindings> doRemoveCard { get; set; }
+
+}
+
+@code{
+
+    [Parameter]
+    public bool isAdmin { get; set; }
+
+    [Parameter]
+    public EventCallback<schema_markdown_cards> doUpdateCard { get; set;}
+
+    [Parameter]
+    public EventCallback<schema_markdown_desks> doUpdateDesk { get; set;}
+
+    [Parameter]
+    public EventCallback<schema_markdown_desks> doCreateDesk { get; set; }
+
+    [Parameter]
+    public EventCallback<MarkdownCard_TwoWayDesksBindings> doCreateCardWithTodos{ get; set; }
+
+    [Parameter]
+    public EventCallback<MarkdownCard_TwoWayDesksBindings> doUpdateCardWithTodos{ get; set; }
+
+    [Parameter]
+    public EventCallback<schema_markdown_cards> doHistory { get; set; }
+}
+
+@code {
+    bool ready = false;
+
+    [Parameter]
+    public EventCallback<ToastNotification> OnToastHandler { get; set; }
+
+    [Parameter]
+    public int task_id { get; set; }
+
+    [Parameter]
+    public List<schema_markdown_desks> Markdown_Desks { get; set; }
+
+    [Parameter]
+    public List<schema_markdown_cards> Markdown_Cards { get; set; }
+
+    [Parameter]
+    public List<schema_markdown_todo_list> Markdown_Todos { get; set; }
+
+    [Parameter]
+    public List<schema_users> Users {get;set;}
+
+    [Parameter]
+    public List<schema_divisions> Divisions { get; set; }
+
+    [Parameter]
+    public schema_users User { get; set; }
+
+}
+
+@code{
+     public IList<SelectData> sd_users { get; set; }
+}
+
+@code {
+
+    public void CallHistory(schema_markdown_cards card)
+    {
+        doHistory.InvokeAsync(card);
+    }
+
+    public List<schema_markdown_cards>? getMDCardsByDesk(schema_markdown_desks Desk)
+    {
+        List<schema_markdown_cards> cards = null;
+        if (Desk != null)
+        {
+            int desk_id = Desk.idmarkdown_desks;
+            if (Markdown_Cards != null)
+            {
+                if (Markdown_Cards.Count > 0)
+                {
+                    cards = Markdown_Cards.Where(p => p.markdown_card_deskid == desk_id).ToList();
+                }
+            }
+        }
+        return cards;
+    }
+
+}
+
+@code {
+
+    schema_markdown_cards card_to_view = new();
+    schema_markdown_desks desk_to_view = new();
+    List<schema_markdown_todo_list> todos_to_view=new();
+
+    public void ev_desk_CardSelected(MarkdownCard_TwoWayDesksBindings mctwdb)
+    {
+        if (mctwdb.Card != null)
+        {
+            card_to_view = mctwdb.Card;
+        }
+        if (mctwdb.Todos != null)
+        {
+            if (mctwdb.Todos.Count > 0)
+            {
+                todos_to_view = new();
+                foreach(var elem in mctwdb.Todos)
+                {
+                    todos_to_view.Add(elem);
+                }
+            }
+        }
+        screen_actions_lst[mctwdb.desk_num] = ScreenActions.Card_View;
+        InvokeAsync(StateHasChanged);
+    }
+
+
+    public void ev_desk_CopyCard(int desk_num)
+    {
+
+    }
+
+    public async Task ev_desk_CreateCard(Markdown_TwoWayDesksBindings desk)
+    {
+        screen_actions_lst[desk.desk_num] = ScreenActions.Card_Create;
+        desk_to_view = desk.Desk;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void ev_desk_Sorting(int desk_num)
+    {
+
+    }
+
+    public async Task ev_desk_CreateDesk(int desk_num)
+    {
+        screen_actions_lst[desk_num] = ScreenActions.Desk_Create;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void ev_desk_MovingCard(int desk_num)
+    {
+
+    }
+
+    public void ev_desk_KillMarkdown(EviCRM.Server.ViewModels.Markdown_Desk_TwoIntBindings tib)
+    {
+
+    }
+
+    public void ev_desk_Markdown(EviCRM.Server.ViewModels.Markdown_Desk_TwoIntBindings tib)
+    {
+
+    }
+
+
+
+    private async Task  CardErrorInterpeter(schema_markdown_cards card)
+    {
+        if (card.markdown_card_date_start > card.markdown_card_date_end)
+        {
+            ToastNotification toast = new ToastNotification("Дата конца не может быть раньше даты начала", ToastNotification.ToastsTypes.Danger);
+            await OnToastHandler.InvokeAsync(toast);
+        }
+        if (card.markdown_card_name == "" || card.markdown_card_name == null)
+        {
+            ToastNotification toast = new ToastNotification("Имя карточки не может быть пустым!", ToastNotification.ToastsTypes.Danger);
+            await OnToastHandler.InvokeAsync(toast);
+        }
+        if (card.markdown_card_description == "" || card.markdown_card_description == null)
+        {
+            ToastNotification toast = new ToastNotification("Описание карточки не может быть пустым!", ToastNotification.ToastsTypes.Danger);
+            await OnToastHandler.InvokeAsync(toast);
+        }
+    }
+
+    private async Task DeskErrorCreatingInterpreter(schema_markdown_desks desk)
+    {
+        if (desk.markdown_desk_name == "" || desk.markdown_desk_name == null)
+        {
+            ToastNotification toast = new ToastNotification("Необходимо ввести название доски", ToastNotification.ToastsTypes.Danger);
+            await OnToastHandler.InvokeAsync(toast);
+        };
+    }
+
+    private async Task DeskCreatedInterpeter(Markdown_TwoWayDesksBindings desk)
+    {
+        screen_actions_lst[desk.desk_num] = ScreenActions.Desk_Main;
+        doCreateDesk.InvokeAsync(desk.Desk);
+        await InvokeAsync(StateHasChanged);
+    }
+
+     private async Task CardUpdatedInterpeter(MarkdownCard_TwoWayDesksBindings card)
+    {
+        // screen_actions_lst[card.desk_num] = ScreenActions.Desk_Main;
+        screen_actions_lst[card.desk_num] = ScreenActions.Desk_Main;
+        await doUpdateCardWithTodos.InvokeAsync(card);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task CardCreatedInterpeter(MarkdownCard_TwoWayDesksBindings card)
+    {
+        // screen_actions_lst[card.desk_num] = ScreenActions.Desk_Main;
+        screen_actions_lst[card.desk_num] = ScreenActions.Desk_Main;
+        await doCreateCardWithTodos.InvokeAsync(card);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void CreateCardClosed(int desk_num)
+    {
+        screen_actions_lst[desk_num] = ScreenActions.Desk_Main;
+        StateHasChanged();
+    }
+
+
+    List<ScreenActions> screen_actions_lst = new List<ScreenActions>();
+
+    enum ScreenActions
+    {
+        Desk_Main,
+        Desk_Create,
+        Desk_Delegate,
+        Card_Create,
+        Card_View,
+        Card_Edit,
+        Card_Delegate,
+    }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Markdown_Desks != null)
+        {
+            if (Markdown_Desks.Count > 0)
+            {
+                for (int i = 0; i < Markdown_Desks.Count; i++)
+                {
+                    screen_actions_lst.Add(ScreenActions.Desk_Main);
+                }
+            }
+        }
+
+        sd_users = new List<SelectData>();
+
+        if (Users != null)
+        {
+            if (Users.Count > 0)
+            {
+                foreach(var elem in Users)
+                {
+                    SelectData sd = new();
+                    sd.Id = elem.id.ToString();
+                    sd.Name = elem.fullname;
+                    sd_users.Add(sd);
+                }
+            }
+        }
+        ready = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+
+
+}

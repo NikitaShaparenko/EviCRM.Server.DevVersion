@@ -1,0 +1,281 @@
+﻿@using System.Net.Sockets
+@using System.Globalization
+
+@inject Context _context
+@inject BackendController bc
+
+
+<div class="modal fade show" id="myModal" style="display:block; background-color: rgba(10,10,10,.8);" aria-modal="true" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">Завершение задачи</h4>
+                <button type="button" class="close" @onclick="@ModalCancel">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group row mb-4">
+                    <label for="ttm_question_title">Вы собираетесь завершить задачу</label>
+
+                    @if (isInTime)
+                    {
+                        <div class="col-lg-10">
+                            <p style="color:green"><b>Задача выполнена в срок!</b></p>
+                            <p>Осталось @ts.Days дней @ts.Hours часов @ts.Minutes минут</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="col-lg-10">
+                            <p style="color:red"><b>Задача выполнена c опозданием!</b></p>
+                            <p>Осталось @ts.Days дней @ts.Hours часов @ts.Minutes минут</p>
+                        </div>
+                    }
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary waves-effect" @onclick="@ModalCancel">Закрыть</button>
+
+                @if (!isInTime)
+                {
+                    <button type="button" @onclick='(() => SendTOScriptCmd("COMPLETEDELAY"))' class="btn btn-danger waves-effect waves-light">Завершить задачу (с задержкой)</button>
+                }
+                @if (isInTime)
+                {
+                    if (@ts.Days > 1)
+                    {
+                        <button type="button" @onclick='(() => SendTOScriptCmd("COMPLETEBEFOREHAND"))' class="btn btn-success waves-effect waves-light">Завершить задачу (заранее)</button>
+                    }
+                    else
+                    {
+                        <button type="button" @onclick='(() => SendTOScriptCmd("COMPLETE"))' class="btn btn-primary waves-effect waves-light">Завершить задачу (в срок)</button>
+                    }
+                }
+
+
+            </div>
+        </div>
+    </div>
+</div>
+
+@code{
+    [Parameter]
+    public schema_tasks Current_Task { get; set; }
+
+     [Parameter]
+    public List<schema_users> Users { get; set; }
+
+    [Parameter]
+    public List<schema_divisions> Divisions { get; set; }
+
+}
+
+@code {
+
+    [Parameter]
+    public string task_id { get; set;}
+
+    [Parameter]
+    public string task_author { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnClose { get; set; }
+
+    [Parameter]
+    public List<string> personal_status { get; set;}
+
+    [Parameter]
+    public List<string> personal_status_arg1 { get; set; }
+
+    [Parameter]
+    public List<string> personal_status_arg2 { get; set; }
+
+
+    public string getUsernameByLogin(string login)
+    {
+        string fullname = "";
+
+        var elem = Users.FirstOrDefault(p => p.login == login);
+
+        if (elem != null)
+        {
+            fullname = elem.fullname;
+        }
+        return fullname;
+    }
+
+    private Task ModalCancel()
+    {
+        return OnClose.InvokeAsync(false);
+    }
+
+    public async Task SendTOScriptCmd(string TOSCRIPT_CMD)
+    {
+        EviCRM.Server.ViewModels.TaskTrackingModelCommon ttmc = new EviCRM.Server.ViewModels.TaskTrackingModelCommon();
+
+        ttmc.task_author = task_author;
+        ttmc.task_id = task_id;
+        ttmc.toscript_cmd = TOSCRIPT_CMD;
+
+        switch(TOSCRIPT_CMD)
+        {
+            case "COMPLETE":
+               
+                string task_author_to = ttmc.task_author;
+                string task_id_to = ttmc.task_id;
+
+                string TOSCRIPT_VAR1 = "";
+                string TOSCRIPT_VAR2 = "";
+
+                schema_task_tracking_main sttm = new()
+            {
+                task_variable1 = TOSCRIPT_VAR1,
+                task_variable2 = TOSCRIPT_VAR2,
+                task_variable3 = "",
+                task_author = task_author_to,
+                task_id = task_id,
+                task_cmd = TOSCRIPT_CMD,
+                task_datetime = DateTime.Now,
+            };
+
+                _context.TaskTrackingMain_Create(sttm);
+                string push_msg = "[Задача - " +  Current_Task.task_name + "] \n";
+                push_msg += "(Пользователь: " + getUsernameByLogin(task_author) + ") \n \n";
+                push_msg += "Задача завершена в срок! \n";
+
+                await  bc.SendTelegramMessage(push_msg,Current_Task,Users,Divisions);
+                break;
+
+            case "COMPLETEBEFOREHAND":
+                task_author_to =  ttmc.task_author;
+                task_id_to = ttmc.task_id;
+
+                TOSCRIPT_VAR1 = "";
+                TOSCRIPT_VAR2 = "";
+
+                sttm = new()
+            {
+                task_variable1 = TOSCRIPT_VAR1,
+                task_variable2 = TOSCRIPT_VAR2,
+                task_variable3 = "",
+                task_author = task_author_to,
+                task_id = task_id_to,
+                task_cmd = TOSCRIPT_CMD,
+                task_datetime = DateTime.Now,
+            };
+
+               _context.TaskTrackingMain_Create(sttm);
+
+                push_msg = "[Задача - " +  Current_Task.task_name + "] \n";
+                push_msg += "(Пользователь: " + getUsernameByLogin(task_author) + ") \n \n";
+                push_msg += "Задача завершена заблаговременно: \n";
+
+                await  bc.SendTelegramMessage(push_msg,Current_Task,Users,Divisions);
+                break;
+
+            default:
+             
+         task_author_to =  ttmc.task_author;
+        task_id_to = ttmc.task_id;
+
+        TOSCRIPT_VAR1 = "";
+        TOSCRIPT_VAR2 = "";
+
+        sttm = new()
+            {
+                task_variable1 = TOSCRIPT_VAR1,
+                task_variable2 = TOSCRIPT_VAR2,
+                task_variable3 = "",
+                task_author = task_author_to,
+                task_id = task_id_to,
+                task_cmd = TOSCRIPT_CMD,
+                task_datetime = DateTime.Now,
+            };
+
+        _context.TaskTrackingMain_Create(sttm);
+
+        push_msg = "[Задача - " +  Current_Task.task_name + "] \n";
+        push_msg += "(Пользователь: " + getUsernameByLogin(task_author_to) + ") \n \n";
+        push_msg += "Задача завершена с задержкой! \n";
+
+        await  bc.SendTelegramMessage(push_msg,Current_Task,Users,Divisions);
+                break;
+        }
+        await OnClose.InvokeAsync(true);
+
+ 
+    }
+       public int getPersonalStatusArrayIDByUsername(string username)
+        {
+            for (int i = 0; i < personal_status_arg1.Count; i++)
+            {
+                if (personal_status_arg1[i] == username)
+                {
+                    return i;
+                }
+            }
+            return 0;
+        }
+
+     string personal_status_updater_packer(int p,string value)
+        {
+
+            string str = "";
+
+            for (int i = 0; i < personal_status.Count; i++)
+            {
+                if (p != i)
+                {
+                    str += personal_status[i] + "$$$";
+                }
+                else
+                {
+                    str += personal_status_arg1[i] + "$===$" + value;
+                }
+            }
+
+              personal_status_arg2[p] = value;
+
+            return str ;
+        }
+
+
+    private Task ModalOk()
+    {
+        return OnClose.InvokeAsync(true);
+    }
+
+    bool isInTime { get; set; }
+
+    DateTime localDateTime { get; set; }
+
+    DateTime dt_datetime_end { get; set; }
+
+    TimeSpan ts { get; set; }
+
+    [Parameter]
+    public DateTime datetime_end { get; set; }
+
+
+
+    protected async override Task OnInitializedAsync()
+    {
+        isInTime = false;
+        localDateTime = DateTime.Now;
+
+        ts = new TimeSpan();
+
+         dt_datetime_end = datetime_end;
+       
+
+        if (dt_datetime_end > localDateTime)
+        {
+            isInTime = true;
+            ts = (dt_datetime_end - localDateTime).Duration();
+        }
+        else
+        {
+            isInTime = false;
+            ts = (localDateTime - dt_datetime_end).Duration();
+        }
+    }
+}

@@ -1,0 +1,231 @@
+﻿@page "/admin_users"
+
+@using EviCRM
+@using System.Diagnostics
+
+@inject BackendController bc;
+@inject Context _context;
+@inject SystemCore sc;
+@inject Sentinel sentinel;
+
+<h5>Админ меню \ Список пользователей</h5>
+<PageTitle>Админ меню \ Список пользователей</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h4 class="card-title mb-4">Пользователи в системе</h4>
+
+                        @if (isModalOpened)
+                        {
+                            <AdminUsersModal 
+                            
+                            OnChangingPassword=@OnHandlerResetPassword 
+                            OnClose=CloseModal 
+                            username=@memory_username 
+                            
+                            />
+                        }
+
+                        @if (ready)
+                        {
+                            int p = 0;
+                            p = Users.Count;
+                            if (p > 0)
+                            {
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-wrap align-middle mb-0">
+
+                                <tr>
+                                            <th>№</th>
+                                            <th>ID</th>
+                                            <th>Логин</th>
+                                            <th>Роль</th>
+                                            <th>Электронная почта</th>
+                                            <th>Полное имя</th>
+                                            <th style="width: 200px;">Отдел</th>
+                                            <th>Должность</th>
+                                            <th>Пароль</th>
+                                            <th>Действие</th>
+                                            <th>Админка</th>
+                                        </tr>
+
+
+                                        @foreach(var elem in Users)
+                                        {
+                                            int i = 0;
+
+                                            <tr>
+                                                <td>@(i+1)</td>
+                                                <td>@elem.id</td>
+                                                <td>@sentinel.TripleDesDecrypt(elem.login)</td>
+
+                                                <td>
+
+                                                    @switch(elem.role)
+                                                    {
+                                                        case "admin":
+                                                         <b>Администратор</b>
+                                                        break;
+
+                                                        case "owner":
+                                                        <b><font color="red">Владелец</font></b>
+                                                        break;
+
+                                                        case "secretary":
+                                                            <b><span class="mdi mdi-crown">Секретарь</span></b>
+                                                            break;
+
+                                                        case "user":
+                                                         <span>Пользователь</span>
+                                                            break;
+
+                                                        default:
+                                                         <span>Неопознанная личность</span>
+                                                            break;
+                                                    }
+                                                </td>
+
+                                                <td>@sentinel.TripleDesDecrypt(elem.email)</td>
+                                                <td>@elem.fullname</td>
+                                               
+                                                <td>
+                                                    @{
+                                                         List<schema_divisions> user_divs = getDivisionsWhereUserExists(elem);
+                                                    }
+                                                   
+                                                    @if (user_divs != null)
+                                                    {
+                                                         <select style="width: 200px;">
+
+                                                        <optgroup label="Отделы">
+                                                            @foreach(var div_elem in user_divs)
+                                                                {
+                                                                     <option value="@div_elem.id">@div_elem.division_name</option>
+                                                                }
+                                                        </optgroup>
+                                                    </select>
+                                                    }
+                                                   
+                                                </td>
+
+                                                <td>@elem.position</td>
+
+                                                <td>
+                                                    <button type="button" class="btn btn-primary active" 
+                                                    @onclick="@(()=>ResetPassword(elem))">
+                                                    Сбросить пароль
+                                                </button>
+                                                </td>
+
+                                                <td>
+
+                                                    @if (elem.flag_activated == false)
+                                                    {
+                                                        <button type="button" class="btn btn-success active" style="border:2;" @onclick="@(()=>Activate(elem))">Активировать</button>
+                                                    }
+                                                    else
+                                                    {
+                                                        <button type="button" class="btn btn-danger active" style="border:2;" @onclick="@(()=>Deactivate(elem))">Деактивировать</button>
+                                                    }
+                                                    </td>
+
+                                                    <td>
+
+                                                         @switch(elem.role)
+                                                    {
+                                                        case "admin":
+                                                          <button type="button" class="btn btn-primary active" style="border:2;" 
+                                                          @onclick="@(()=>DowngradeToUser(elem))">
+                                                          Понизить до пользователя
+                                                      </button>
+                                                        break;
+
+                                                        case "owner":
+                                                        <button type="button" class="btn btn-danger active" style="border:2;" 
+                                                        @onclick="@(()=>UpgradeToAdmin(elem))">
+                                                        Понизить до администратора
+                                                    </button>
+                                                        break;
+
+                                                        case "secretary":
+                                                            <button type="button" class="btn btn-primary active" style="border:2;" 
+                                                            @onclick="@(()=>DowngradeToUser(elem))">
+                                                            Понизить до пользователя
+                                                        </button>
+                                                            break;
+
+                                                        default:
+                                                           <button type="button" class="btn btn-danger active" style="border:2;" 
+                                                           @onclick="@(()=>UpgradeToAdmin(elem))">
+                                                               Сделать администратором
+                                                               </button>
+                                                            break;
+                                                    }
+
+                                                </td>
+                                            </tr>
+                                            i++;
+                                        }
+                                    </table>
+                                </div>
+                            }
+                        }
+
+                        <p></p>
+
+
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <AuthorizationPrompt Title="Вам необходимо зарегистрироваться или войти для просмотра этой страницы! " />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+
+    bool ready { get; set; }
+
+    schema_users selected_User = new schema_users();
+    List<schema_users> Users = new List<schema_users>();
+    List<schema_divisions> Divisions = new List<schema_divisions>();
+
+    bool isModalOpened { get; set; }
+
+    string memory_id { get; set; }
+    string memory_username { get; set; }
+    int memory_id_arr { get; set; }
+
+    public List<schema_divisions> getDivisionsWhereUserExists(schema_users user)
+    {
+        List<schema_divisions> divs = new();
+
+        if (Divisions != null)
+        {
+            foreach(var elem in Divisions)
+            {
+                List<string> cast = new();
+                cast = bc.getMultipleStringDecodingString(elem.division_cast);
+
+                if (cast != null)
+                {
+                    if (cast.Contains(user.id.ToString()))
+                    {
+                        divs.Add(elem);
+                    }
+                }
+
+            }
+        }
+        return divs;
+        
+    }
+
+}

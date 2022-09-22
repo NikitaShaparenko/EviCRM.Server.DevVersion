@@ -1,0 +1,845 @@
+﻿@page "/maps"
+
+@using System.Drawing
+@using EviCRM.Server.Pages.Maps
+@using EviCRM.Server.Pages.Maps.Data
+@using EviCRM.Server.Pages.Maps.Models
+@using EviCRM.Server.Pages.Maps.Models.Events
+@using EviCRM.Server.Core;
+@using Microsoft.AspNetCore.SignalR.Client
+
+@inject IJSRuntime jsRuntime
+@inject NavigationManager uriHelper;
+@inject NavigationManager NavigationManager  
+
+@inject ILocalStorageService _localStorageService
+@inject ISessionStorageService _sessionStorageService
+@inject IWebHostEnvironment _env
+
+@inject IToastService _toastService
+
+@inject SignInManager<IdentityUser> SignInManager
+@inject AuthenticationStateProvider authStateProvider
+
+@inject Context _context
+@inject BackendController bc
+@inject SystemCore sc
+@inject Sentinel sentinel
+@inject LiveNature liven
+
+
+<h5>Карты</h5>
+<PageTitle>Карты</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+@if (ready)
+{
+
+    <div id="container">
+        <div style="width:@(windowWidth - 200); height:@(windowHeight)px">
+            <EviCRM.Server.Pages.Maps.LeafletMainHandler 
+                Map="_map"
+                ModalCalled=CheckForModalInteropping
+                
+                mpvm=@mpvm_lst
+                l_mrk=lst_mrkr
+                l_mrk_alexandra=lst_mrkr_alexandra />
+        </div>
+
+        @if (isModalOpened)
+        {
+            <MapsModal isCreate=@modal_isCreate
+               Lat=@modal_lat
+               Lng=@modal_lng
+               Alt=@modal_alt
+
+               view_Body=@modal_viewbody
+
+               OnClose=Modal_OnCloseHandler
+               OnSave=Modal_OnSaveHandler />
+        }
+
+        <div class="form-inline m-2">
+
+            @if (mpvm_lst.Count > 0)
+            {
+                <table class="table table-striped mb-0">
+
+                    <tr>
+                        <th>№</th>
+                        <th>Название точки</th>
+                        <th>Добавлена</th>
+                        <th>Координаты</th>
+                        <th>Действия</th>
+                    </tr>
+
+                    @foreach (var elem in mpvm_lst)
+                    {
+                        <tr>
+                            <td>
+
+                                @{
+                                    int index = mpvm_lst.IndexOf(elem);
+                                    index += 1;
+                                }
+
+                                @index
+
+                            </td>
+
+                            <td><input type="text" name="elem_name" @bind="@elem.Name" /></td>
+                            <td>@(elem.addedDateTime.ToShortDateString() + " " + elem.addedDateTime.ToShortTimeString())</td>
+                            <td>@("N " + elem.Lat + ", E " + elem.Lng)</td>
+
+                            <td>
+                                <button type="button" class="btn btn-outline-primary" @onclick="() => PanTo(elem.Lat,elem.Lng,elem.mpd)"> Показать </button>
+
+                                  @if (leaflet == LeafletModes.standart)
+                                        {
+                                            <button type="button" class="btn btn-outline-success" @onclick="()=>SavePoint(elem)"><i class='bx bx-save'></i> </button>
+                                            <button type="button" class="btn btn-outline-danger" @onclick="()=>KillPoint(elem)"><i class="fas fa-times ms-1"></i></button>
+                                        }
+                                        else
+                                        {
+                                              <button type="button" class="btn btn-outline-success" @onclick="()=>ChoosePoint(elem)"><i class='bx bx-select-multiple'></i> </button>
+                                        }
+                                    </td>
+
+                        </tr>
+                    }
+
+                </table>
+            }
+        </div>
+
+        @if (Alexandra_Locations.Count > 0)
+        {
+            <div class="form-inline m-2">
+                <h6>Точки на карте, добавленные Александрой</h6>
+
+                <table class="table table-striped mb-0">
+
+                    <tr>
+                        <th>№</th>
+                        <th>Название точки</th>
+                        <th>Добавлена</th>
+                        <th>Координаты</th>
+                        <th>Действия</th>
+                    </tr>
+
+                    @foreach (var elem in mpvm_lst_alexandra)
+                    {
+                        <tr>
+
+                            <td>
+
+                                @{
+                                    int index = mpvm_lst_alexandra.IndexOf(elem);
+                                    index += 1;
+                                }
+
+                                @index
+
+                            </td>
+
+                            <td><input type="text" name="elem_name" @bind="@elem.Name" /></td>
+                            <td>@(elem.addedDateTime.ToShortDateString() + " " + elem.addedDateTime.ToShortTimeString())</td>
+                            <td>@("N " + elem.Lat + ", E " + elem.Lng)</td>
+
+                            <td>
+                                <button type="button" class="btn btn-outline-primary" @onclick="() => PanTo(elem.Lat,elem.Lng,elem.mpd)"> Показать </button>
+                               
+                                @if (leaflet == LeafletModes.standart)
+                                        {
+                                            <button type="button" class="btn btn-outline-success" @onclick="()=>AlexandraSavePoint(elem)"><i class='bx bx-save'></i> </button>
+                                            <button type="button" class="btn btn-outline-danger" @onclick="()=>AlexandraKillPoint(elem)"><i class="fas fa-times ms-1"></i></button>
+                                        }
+                                        else
+                                        {
+                                             <button type="button" class="btn btn-outline-success" @onclick="()=>AlexandraChoosePoint(elem)"><i class='bx bx-select-multiple'></i> </button>
+                                        }
+                                        
+                            </td>
+
+                        </tr>
+                    }
+
+                </table>
+            </div>
+        }
+
+
+    </div>
+
+}
+else
+{
+    <h5><i class="bx bx-buoy bx-spin text-primary display-3"></i> Загружаю карты, ожидайте пожалуйста... </h5>
+}
+
+    </Authorized>
+
+    <NotAuthorized>
+        <AuthorizationPrompt Title="Вам необходимо зарегистрироваться или войти! " />
+    </NotAuthorized>
+
+</AuthorizeView>
+
+
+@code{
+
+    //Toasts:
+
+    #region Toasts Notifications
+
+     //Toast Notifications
+        private string _toastText = $@"<strong>Toast:</strong> This is a(n) {NotificationTypes.Primary} notification";
+	    private bool _toastShowIcon = true;
+	    private bool _toastShowCloseButton = true;
+	    private bool _toastShowCountdownProgress = true;
+	    private uint _toastAutoCloseInSec = 5;
+	    private uint _toastShadowEffect = 5;
+	    private NotificationStyles _toastStyle;
+	    private NotificationTypes _toastTypeLevel;
+
+    //Toasts
+    private async Task ToastsNotifications_ShowAllToast()
+    {
+        foreach (var item in Enum.GetValues<NotificationTypes>())
+        {
+            _toastService.ShowToast($@"<strong>Toast оповещения:</strong> Это оповещение типа {item}", item);
+        }
+    }
+
+    private Guid _lastToastId;
+
+    private async Task ToastsNotifications_ShowCustomToast(string toastText, NotificationStyles ns, NotificationTypes ntype)
+    {
+        _lastToastId = _toastService.ShowToast(new ToastSettings()
+            {
+                Content = builder => builder.AddMarkupContent(0, toastText),
+                NotificationStyle = ns,
+                Type = ntype,
+                AutoCloseInSec = _toastAutoCloseInSec,
+                ShadowEffect = _toastShadowEffect,
+                ShowCloseButton = _toastShowCloseButton,
+                ShowCloseCountdownProgress = _toastShowCountdownProgress,
+                ShowIcon = _toastShowIcon
+            });
+    }
+
+    private async Task ToastsNotifications_ShowCustomToast_Primary(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Primary);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Secondary(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Secondary);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Info(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Info);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Success(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Success);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Warning(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Warning);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Danger(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Danger);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Light(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Light);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Dark(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Dark);
+    }
+    private async Task RemoveAllToasts()
+    {
+        _toastService.ClearAll();
+    }
+    private async Task RemoveLastToasts()
+    {
+        if (_lastToastId != Guid.Empty)
+        {
+            _toastService.RemoveToast(_lastToastId);
+        }
+    }
+    #endregion
+
+
+        private HubConnection hubConnection;
+
+     protected async Task LoadData()
+    {
+        await ToastsNotifications_ShowCustomToast_Info("Загрузила новые сведения в картах!");
+    }  
+
+    public bool IsConnected =>  
+        hubConnection.State == HubConnectionState.Connected;  
+  
+   
+
+     private void CallLoadData()   
+    { 
+        string connection_string = "server = 82.146.44.138;user = mysql_c;password = 512Dcfbd28#;database=evicrm";
+        
+        var contextOptions = new DbContextOptionsBuilder<Context>()
+    .UseMySql(connection_string, ServerVersion.AutoDetect(connection_string))
+    .Options;
+
+        using (var dbContext = new Context(contextOptions))
+        {
+        if (isAdmin)
+                {
+                    Maps_Points = dbContext.Maps_Get(user_model.login);
+                    Alexandra_Locations = dbContext.AlexandraMaps_Get(user_model.login);
+                }
+                else
+                {               
+                    Maps_Points = dbContext.Maps_Get(user_model.login);
+                Alexandra_Locations = dbContext.AlexandraMaps_Get(user_model.login);
+                }
+    }
+        Task.Run(async () =>  
+        {  
+            await LoadData();  
+        });  
+    }  
+
+}
+
+@functions
+{
+    #region Local Storage
+
+    private int _localStorageCount;
+    private IList<KeyValuePair<string, string>> _localStorageItems;
+
+    private async Task InsertLocalStorageItems(string key, string val)
+    {
+        await _localStorageService.SetItemAsync(key, val);
+    }
+    private async Task<string> GetLocalStorageItems(string key)
+    {
+        return await _localStorageService.GetItemAsStringAsync(key);
+    }
+    private async Task RefreshLocalStorageItems()
+    {
+        _localStorageItems = new List<KeyValuePair<string, string>>();
+        await foreach (var key in _localStorageService.GetAllKeysAsync())
+        {
+            if (key is null)
+                continue;
+
+            _localStorageItems.Add(new KeyValuePair<string, string>(key, await _localStorageService.GetItemAsStringAsync(key)));
+        }
+    }
+    private async Task SaveCustomLocalStorageItem(string key, string val)
+    {
+        await _localStorageService.SetItemAsync(key, val);
+        await RefreshLocalStorageItems();
+    }
+
+    #endregion
+}
+
+@code {
+
+    string user_ { get; set; }
+
+    private IJSObjectReference jsModule;
+    LeafletModes leaflet = LeafletModes.standart;
+
+    enum LeafletModes
+    {
+        standart,
+        custom_point,
+    }
+
+    public int windowHeight, windowWidth;
+
+    public class WindowDimensions
+    {
+        public int Width { get; set; }
+        public int Height { get; set; }
+    }
+
+    List<schema_alexandra_locations> Alexandra_Locations = new();
+    List<schema_maps_points> Maps_Points = new();
+
+}
+
+@code{
+
+    private async Task<bool> isCustomShow()
+    {
+        if (await _localStorageService.ContainKeyAsync("extra_news"))
+        {
+            return true;
+        }
+        return false;
+    }
+
+}
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            jsModule = await jsRuntime.InvokeAsync<IJSObjectReference>("import", "./assets/js/client_screensize.js");
+            var dimension = await jsModule.InvokeAsync<WindowDimensions>("getWindowSize");
+
+            windowHeight = dimension.Height;
+            windowWidth = dimension.Width;
+
+            // ===== Local Storage =====
+            if (await isCustomShow())
+            {
+                leaflet = LeafletModes.custom_point;
+                await _localStorageService.RemoveItemAsync("extra_news");
+            }
+            else{
+                leaflet = LeafletModes.standart;
+            }
+
+            user_ = authStateProvider.GetAuthenticationStateAsync().Result.User.Identity.Name;
+
+            //Получаем карточку пользователя
+
+            if (user_ != null)
+            {
+                user_model = _context.User_Get(user_);
+
+                //Проверка админки
+                if (user_model.role == "admin" 
+                    || user_model.role=="owner"
+                    || user_model.role =="secretary")
+                {
+                    isAdmin = true;
+                }
+                else
+                {
+                    isAdmin = false;
+                }
+
+                //Загрузка данных
+
+                Maps_Points = _context.Maps_Get(user_model.login);
+                Alexandra_Locations = _context.AlexandraMaps_Get(user_model.login);
+            }
+            else
+            {
+                sc.Log("Leaflet", $"Пользователь {user_model.fullname} открыл карты",SystemCore.LogLevels.Info);
+                sc.Syslog(_env, user_model.login, "Карты", "Открыл карты", SystemCore.LogLevels.Info);
+                return;
+            }
+
+            mpvm_lst.Clear();
+
+            if (Maps_Points != null)
+            {
+                foreach(var elem in Maps_Points)
+                {
+                    MapsPoint_ViewModel mpvm = new MapsPoint_ViewModel
+                        {
+                            Lat = float.Parse(elem.point_e),
+                            Lng = float.Parse(elem.point_n),
+                            Alt = 0,
+                            user_login = _user,
+                            addedDateTime = elem.point_whenadd,
+                            Name = elem.point_description,
+                            smp = elem,
+                        };
+
+                    mpvm.smp = elem;
+
+                    MapPopupData mpd = new MapPopupData();
+                    mpd.LatLng = new LatLng(mpvm.Lat, mpvm.Lng);
+                    mpd.Content = mpvm.Name;
+                    mpvm.mpd = mpd;
+                    mpvm_lst.Add(mpvm);
+
+                    var marker = new Marker(mpvm.Lat, mpvm.Lng);
+                    marker.Tooltip = new Models.Tooltip { Content = mpvm.Name };
+
+                    lst_mrkr.Add(marker);
+
+                }
+            }
+
+            //Alexandra MapsPoints
+
+            mpvm_lst_alexandra.Clear();
+
+            if (Alexandra_Locations != null)
+            {
+                if (Alexandra_Locations.Count > 0)
+                {
+                    foreach(var elem in Alexandra_Locations)
+                    {
+                        MapsPoint_ViewModel mpvm = new MapsPoint_ViewModel
+                            {
+                                Lat = float.Parse(elem.lat),
+                                Lng = float.Parse(elem.lng),
+                                Alt = 0,
+                                user_login = _user,
+                                addedDateTime = elem.datetime,
+                                Name = elem.name,
+                                sal = elem,
+                    };
+
+                    mpvm.sal = elem;
+
+                        MapPopupData mpd = new MapPopupData();
+                        mpd.LatLng = new LatLng(mpvm.Lat, mpvm.Lng);
+                        mpd.Content = mpvm.Name;
+                        mpvm.mpd = mpd;
+                        mpvm_lst_alexandra.Add(mpvm);
+
+                        var marker = new Marker(mpvm.Lat, mpvm.Lng);
+                        marker.Tooltip = new Models.Tooltip { Content = mpvm.Name };
+
+                        lst_mrkr_alexandra.Add(marker);
+
+                    }
+                }
+            }
+
+            #region ALive
+            hubConnection = new HubConnectionBuilder()
+        .WithUrl(NavigationManager.ToAbsoluteUri("/alive"))
+        .Build();
+
+            hubConnection.On<string, string>("ReceiveMessage", (user, message) =>
+            {
+                CallLoadData();
+                StateHasChanged();
+            });
+
+            hubConnection.On<string>("ReceiveMessageDirectly", (user) =>
+            {
+                if (user == user_model.login)
+                {
+                    CallLoadData();
+                    StateHasChanged();
+                }
+            });
+            await hubConnection.StartAsync();
+            #endregion
+
+            // ===== Leaflet =====
+
+            _map = new Map(jsRuntime)
+                {
+                    Center = _startAt,
+                    Zoom = 4.8f
+                };
+
+            _map.OnInitialized += () =>
+            {
+                _map.AddLayer(new TileLayer
+                    {
+                        UrlTemplate = "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                        Attribution = "&copy; карты <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a>",
+                    });
+            };
+
+            // ===== /Leaflet =====
+
+            isModalOpened = false;
+           
+
+            ready = true;
+
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+    }
+
+    @code{
+
+    private async Task WritePoint(string text)
+    {
+        await SaveCustomLocalStorageItem("xtra_news", text);
+    }
+
+    //Выбор точки Александры
+    private void AlexandraChoosePoint(MapsPoint_ViewModel mpvm)
+    {
+        schema_alexandra_locations aloc = new();
+
+         Task.Run(async () =>  
+        {  
+           await WritePoint("alexandra" + mpvm.sal.idalexandra_location.ToString());
+        });  
+
+            sc.Log("Maps", $"Пользователь {user_model.fullname} выбрал точку, которую прислала Александра '{aloc.name}': E {aloc.lat} N {aloc.lng}", SystemCore.LogLevels.Info);
+            sc.Syslog(_env, user_model.login, "Карты", $"выбрал точку, которую прислала Александра '{aloc.name}': E {aloc.lat} N {aloc.lng}", SystemCore.LogLevels.Info);
+
+            //uriHelper.NavigateTo("/maps", true);
+        }
+
+        //Сохранение точки Александры
+        private void AlexandraSavePoint(MapsPoint_ViewModel mpvm)
+        {
+            schema_alexandra_locations aloc = new();
+
+            mpvm.sal.name = mpvm.Name;
+            _context.AlexandraMaps_Update(mpvm.sal);
+
+
+            if(user_model != null)
+            {
+                hubConnection.SendAsync("SendMessageDirectly", user_model.login);
+            }
+            else
+            {
+                hubConnection.SendAsync("SendMessage", "username", "message");
+            }
+
+            sc.Log("Maps", $"Пользователь {user_model.fullname} сохранил точку, которую прислала Александра '{aloc.name}': E {aloc.lat} N {aloc.lng}", SystemCore.LogLevels.Info);
+            sc.Syslog(_env, user_model.login, "Карты", $"сохранил точку, которую прислала Александра '{aloc.name}': E {aloc.lat} N {aloc.lng}", SystemCore.LogLevels.Info);
+        }
+
+        //Удаление точки Александры
+        private void AlexandraKillPoint(MapsPoint_ViewModel mpvm)
+        {
+                _context.AlexandaMaps_Remove(mpvm.sal.idalexandra_location);
+
+                  if(user_model != null)
+            {
+                hubConnection.SendAsync("SendMessageDirectly", user_model.login);
+            }
+            else
+            {
+                hubConnection.SendAsync("SendMessage", "username", "message");
+            }
+
+            sc.Log("Maps", $"Пользователь {user_model.fullname} удалил точку, которую прислала Александра '{mpvm.Name}': E {mpvm.Lat} N {mpvm.Lng}", SystemCore.LogLevels.Info);
+            sc.Syslog(_env, user_model.login, "Карты", $" удалил точку, которую прислала Александра '{mpvm.Name}': E {mpvm.Lat} N {mpvm.Lng}", SystemCore.LogLevels.Info);
+        }
+}
+
+
+@code{
+    private void ChoosePoint(MapsPoint_ViewModel mpvm)
+    {
+         Task.Run(async () =>  
+        {  
+           await WritePoint(mpvm.sal.idalexandra_location.ToString());
+        });  
+       
+        sc.Log("Maps", $"Пользователь {user_model.fullname} выбрал точку '{mpvm.smp.point_description}': E {mpvm.smp.point_e} N {mpvm.smp.point_n}", SystemCore.LogLevels.Info);
+        sc.Syslog(_env, user_model.login, "Карты", $"выбрал точку '{mpvm.smp.point_description}': E {mpvm.smp.point_e} N {mpvm.smp.point_n}", SystemCore.LogLevels.Info);
+
+    }
+
+    private void SavePoint(MapsPoint_ViewModel mpvm)
+    {
+        mpvm.smp.point_description = mpvm.Name;
+        _context.Maps_Update(mpvm.smp);
+
+          if(user_model != null)
+            {
+                hubConnection.SendAsync("SendMessageDirectly", user_model.login);
+            }
+            else
+            {
+                hubConnection.SendAsync("SendMessage", "username", "message");
+            }
+
+          sc.Log("Maps", $"Пользователь {user_model.fullname} добавил точку '{mpvm.smp.point_description}': E {mpvm.smp.point_e} N {mpvm.smp.point_n}", SystemCore.LogLevels.Info);
+            sc.Syslog(_env, user_model.login, "Карты", $"добавил точку '{mpvm.smp.point_description}': E {mpvm.smp.point_e} N {mpvm.smp.point_n}", SystemCore.LogLevels.Info);
+
+    }
+
+    private void KillPoint(MapsPoint_ViewModel mpvm)
+    {
+        _context.Maps_Remove(mpvm.smp.idmaps_points);
+
+          if(user_model != null)
+            {
+                hubConnection.SendAsync("SendMessageDirectly", user_model.login);
+            }
+            else
+            {
+                hubConnection.SendAsync("SendMessage", "username", "message");
+            }
+             sc.Log("Maps", $"Пользователь {user_model.fullname} удалил точку '{mpvm.smp.point_description}': E {mpvm.smp.point_e} N {mpvm.smp.point_n}", SystemCore.LogLevels.Info);
+            sc.Syslog(_env, user_model.login, "Карты", $"удалил точку '{mpvm.smp.point_description}': E {mpvm.smp.point_e} N {mpvm.smp.point_n}", SystemCore.LogLevels.Info);
+
+        }
+
+     public void Modal_OnCloseHandler(bool isClosed)
+    {
+        _map.modal_maps_interop_isModalCalled = false;
+        isModalOpened = false;
+
+        StateHasChanged();
+    }
+
+    public void Modal_OnSaveHandler(string body)
+    {
+        isModalOpened = false;
+
+        MapsPoint_ViewModel mpvm = new MapsPoint_ViewModel
+            {
+                Lat = modal_lat,
+                Lng = modal_lng,
+                Alt = modal_alt,
+                user_login = user_,
+                addedDateTime = DateTime.Now,
+                Name = body,
+            };
+
+
+        SetMarkerOnMap(mpvm.Lat, mpvm.Lng, body);
+
+        mpvm_lst.Add(mpvm);
+
+        _context.Maps_Create(mpvm);
+
+          if(user_model != null)
+            {
+                hubConnection.SendAsync("SendMessageDirectly", user_model.login);
+            }
+            else
+            {
+                hubConnection.SendAsync("SendMessage", "username", "message");
+            }
+
+            
+          sc.Log("Maps", $"Пользователь {user_model.fullname} добавил точку '{mpvm.smp.point_description}': E {mpvm.smp.point_e} N {mpvm.smp.point_n}", SystemCore.LogLevels.Info);
+            sc.Syslog(_env, user_model.login, "Карты", $"добавил точку '{mpvm.smp.point_description}': E {mpvm.smp.point_e} N {mpvm.smp.point_n}", SystemCore.LogLevels.Info);
+
+
+        StateHasChanged();
+    }
+
+    schema_users user_model = new();
+}
+
+
+
+    @code{
+    
+    public void CheckForModalInteropping()
+    {
+        if (_map.modal_maps_interop_isModalCalled == true)
+        {
+            modal_alt = _map.modal_maps_interop_latlng.Alt;
+            modal_lng = _map.modal_maps_interop_latlng.Lng;
+            modal_lat = _map.modal_maps_interop_latlng.Lat;
+            modal_isCreate = _map.modal_maps_interop_isCreate;
+
+            isModalOpened = true;
+            StateHasChanged();
+        }
+    }
+
+    public void SetMarkerOnMap(float lat, float lng, string tooltip_content)
+    {
+        // Create the marker
+        var marker = new Marker(lat, lng);
+        marker.Tooltip = new Models.Tooltip { Content = tooltip_content };
+
+        // Add it to the layers collection
+        _map.AddLayer(marker);
+    }
+
+    private LatLng _startAt = new LatLng(47.5574007f, 16.3918687f);
+    public string CityName { get; set; }
+
+    private void FindCity()
+    {
+        _circle.Radius = 5000000f;
+        var city = cityService.FindCity(CityName);
+        if (city != null)
+        {
+            var marker = new Marker(city.Coordinates)
+                {
+                    Icon = new EviCRM.Server.Pages.Maps.Models.Icon
+                    {
+                        Url = city.CoatOfArmsImageUrl,
+                        ClassName = "map-icon",
+                    },
+                    Tooltip = new Models.Tooltip
+                    {
+                        Content = city.Name,
+                    },
+                    Popup = new Popup
+                    {
+                        Content = city.Description,
+                    }
+                };
+
+            _map.AddLayer(marker);
+        }
+    }
+
+    private void ZoomMap()
+    {
+        _map.FitBounds(new PointF(45.943f, 24.967f), new PointF(46.943f, 25.967f), maxZoom: 5f);
+    }
+
+    private void PanTo(float lat, float lng, MapPopupData mpd)
+    {
+        _map.OpenMapPopup(mpd);
+        _map.PanTo(new PointF(lat, lng), animate: true, duration: 10f);
+    }
+
+    public async Task<BrowserDimension> GetDimensions()
+    {
+        return await jsRuntime.InvokeAsync<BrowserDimension>("getDimensions");
+    }
+
+    public class BrowserDimension
+    {
+        public int Width { get; set; }
+        public int Height { get; set; }
+    }
+
+    public void ModalOpen()
+    {
+        isModalOpened = true;
+    }
+
+        List<MapsPoint_ViewModel> mpvm_lst = new List<MapsPoint_ViewModel>();
+    List<MapsPoint_ViewModel> mpvm_lst_alexandra = new List<MapsPoint_ViewModel>();
+
+    List<Marker> lst_mrkr = new List<Marker>();
+    List<Marker> lst_mrkr_alexandra = new List<Marker>();
+
+    BrowserDimension bd = new BrowserDimension();
+
+    public bool isModalOpened { get; set; }
+
+    private Map _map;
+
+    private Circle _circle;
+    public CityService cityService;
+
+    string style_params = "";
+
+    float modal_alt = 0;
+    float modal_lng = 0;
+    float modal_lat = 0;
+    bool modal_isCreate = false;
+    string modal_viewbody { get; set; }
+
+    string _user { get; set; }
+    string _user_role { get; set; }
+    bool isAdmin { get; set; }
+
+    bool ready = false;
+
+    }

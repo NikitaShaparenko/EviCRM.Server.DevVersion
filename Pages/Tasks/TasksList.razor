@@ -1,0 +1,343 @@
+﻿@page "/tasks_list"
+
+@using EviCRM.Server.Core
+@using System.Collections.Generic;
+@using System.Net
+@using EviCRM.Server.Pages.Tasks.Components
+@using EviCRM.Server.ViewModels
+
+@inject SignInManager<IdentityUser> SignInManager
+@inject UserManager<IdentityUser> UserManager
+
+@using Majorsoft.Blazor.Extensions.BrowserStorage
+@using Microsoft.AspNetCore.Identity
+
+@inject NavigationManager UriHelper
+@inject IWebHostEnvironment _env
+@inject ILocalStorageService _localStorageService
+@inject ISessionStorageService _sessionStorageService
+
+@inject BackendController bc
+@inject SystemCore sc
+@inject Sentinel sentinel
+@inject Context _context
+
+@inject SignInManager<IdentityUser> SignInManager
+@inject AuthenticationStateProvider authStateProvider
+
+<h5>Задачи \ Списком</h5>
+<PageTitle>Задачи \ Списком</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <div class="row">
+            <!--<div class="col-lg-8">-->
+            <div class="card">
+                <div class="card-body">
+                    <h4 class="card-title mb-4">Запланированные</h4>
+                    <div class="table-responsive">
+                        <table class="table table-nowrap align-middle mb-0">
+                            @if (tasks_b1 == 0)
+                            {
+                                <h5 class="text-truncate font-size-14 m-0"><a href="javascript: void(0);" class="text-dark">Нет задач в текущем представлении</a></h5>
+                            }
+                            else
+                            {
+                                <thead class="table-light">
+                                    <tr>
+                                        <th scope="col" style="width: 70px;">#</th>
+                                        <th scope="col">Сроки задачи</th>
+                                        <th scope="col">Название задачи</th>
+                                        <th scope="col">Состав</th>
+                                        <th scope="col">Командный статус</th>
+                                        <th scope="col">Личный статус</th>
+                                        <th scope="col">Создатель задачи</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+
+                                    @if (Tasks != null)
+                                        foreach (var elem in Tasks)
+                                        {
+                                            <TaskList_Unit cat="planned"
+                                               Users=@Users
+                                               Divisions=@Divisions
+                                               isAdmin=@isAdmin
+                                               session_user_data=@user_ 
+                                               Task_=@elem
+                                               User=@user_model/>
+                                        }
+                                </tbody>
+
+                            }
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            @*-----*@
+
+            <div class="card">
+                <div class="card-body">
+                    <h4 class="card-title mb-4">В процессе выполнения</h4>
+                    <div class="table-responsive">
+                        <table class="table table-nowrap align-middle mb-0">
+                            @if (tasks_b2 == 0)
+                            {
+                                <h5 class="text-truncate font-size-14 m-0"><a href="javascript: void(0);" class="text-dark">Нет задач в текущем представлении</a></h5>
+                            }
+                            else
+                            {
+                                <thead class="table-light">
+                                    <tr>
+                                        <th scope="col" style="width: 70px;">#</th>
+                                        <th scope="col">Название задачи</th>
+                                        <th scope="col">Состав</th>
+                                        <th scope="col">Командный статус</th>
+                                        <th scope="col">Личный статус</th>
+                                        <th scope="col">Создатель задачи</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+
+                                  @if (Tasks != null)
+                                        foreach (var elem in Tasks)
+                                        {
+                                            <TaskList_Unit cat="in_progress"
+                                               Users=@Users
+                                               Divisions=@Divisions
+                                               isAdmin=@isAdmin
+                                               session_user_data=@user_ 
+                                               Task_=@elem
+                                               User=@user_model/>
+                                        }
+                                </tbody>
+
+                            }
+
+
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            @* ---- *@
+
+            <div class="card">
+                <div class="card-body">
+                    <h4 class="card-title mb-4">Выполнены</h4>
+                    <div class="table-responsive">
+                        <table class="table table-nowrap align-middle mb-0">
+                            @if (tasks_b3 == 0)
+                            {
+                                <h5 class="text-truncate font-size-14 m-0"><a href="javascript: void(0);" class="text-dark">Нет задач в текущем представлении</a></h5>
+                            }
+                            else
+                            {
+                                <thead class="table-light">
+                                    <tr>
+                                        <th scope="col" style="width: 70px;">#</th>
+                                        <th scope="col">Название задачи</th>
+                                        <th scope="col">Состав</th>
+                                        <th scope="col">Командный статус</th>
+                                        <th scope="col">Личный статус</th>
+                                        <th scope="col">Создатель задачи</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+
+                                   @if (Tasks != null)
+                                        foreach (var elem in Tasks)
+                                        {
+                                            <TaskList_Unit cat="completed"
+                                               Users=@Users
+                                               Divisions=@Divisions
+                                               isAdmin=@isAdmin
+                                               session_user_data=@user_ 
+                                               Task_=@elem
+                                               User=@user_model/>
+                                        }
+                                </tbody>
+                            }
+
+
+
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <AuthorizationPrompt Title="Вам необходимо зарегистрироваться или войти! " />
+    </NotAuthorized>
+</AuthorizeView>
+
+@functions
+{
+    #region Local Storage
+    private int _localStorageCount;
+    private IList<KeyValuePair<string, string>> _localStorageItems;
+
+    List<int> users_in_lst = new List<int>();
+    List<int> users_auth_lst = new List<int>();
+
+    private async Task InsertLocalStorageItems(string key, string val)
+    {
+        await _localStorageService.SetItemAsync(key, val);
+    }
+    private async Task RefreshLocalStorageItems()
+    {
+        _localStorageItems = new List<KeyValuePair<string, string>>();
+        await foreach (var key in _localStorageService.GetAllKeysAsync())
+        {
+            if (key is null)
+                continue;
+
+            _localStorageItems.Add(new KeyValuePair<string, string>(key, await _localStorageService.GetItemAsStringAsync(key)));
+        }
+
+    }
+    private async Task SaveCustomLocalStorageItem(string key, string val)
+    {
+        await _localStorageService.SetItemAsync(key, val);
+        await RefreshLocalStorageItems();
+    }
+    private async Task<string> GetLocalStorageItems(string key)
+    {
+        return await _localStorageService.GetItemAsStringAsync(key);
+    }
+
+    #endregion
+
+    //LocalStorage
+
+    public bool isArrayContainsIndex(List<int> indexes, int index)
+    {
+        return (indexes.Contains(index));
+    }
+
+    public async Task TaskShow(string str_num)
+    {
+        await SaveCustomLocalStorageItem("task_tracking_id", str_num);
+        UriHelper.NavigateTo("/task_tracking");
+    }
+
+
+}
+
+@code {
+
+    int tasks_b1 = 0;
+    int tasks_b2 = 0;
+    int tasks_b3 = 0;
+
+    bool isAdmin = false;
+    string user_ { get; set; }
+
+    List<schema_tasks> Tasks = new();
+    List<schema_users> Users = new();
+    List<schema_divisions> Divisions = new();
+
+    schema_users user_model = new();
+
+    protected async override Task OnInitializedAsync()
+    {
+        user_ = authStateProvider.GetAuthenticationStateAsync().Result.User.Identity.Name;
+
+        if (user_ != null)
+        {
+            user_model = _context.User_Get(user_);
+
+            //Проверка админки
+            if (user_model.role == "admin"
+                || user_model.role == "owner"
+                || user_model.role == "secretary")
+            {
+                isAdmin = true;
+            }
+            else
+            {
+                isAdmin = false;
+            }
+
+            //Загрузка данных
+
+            if (isAdmin)
+            {
+                Tasks = _context.Tasks_Get();
+                Users = _context.Users_Get();
+            }
+            else
+            {
+                Tasks = _context.Tasks_Get(user_);
+                Users = _context.Users_Get();
+            }
+
+            Divisions = _context.Divisions_Get();
+
+            List<int> users_in_lst = isInCast(user_);
+            List<int> users_auth_lst = isInAuthors(user_);
+        }
+        else
+        {
+            //syslog
+            //notify
+            return;
+        }
+
+        foreach (var elem in Tasks)
+        {
+            string task_st = elem.task_status;
+
+            if (task_st == "waiting" || task_st == "approved")
+            {
+                tasks_b1++;
+            }
+            if (task_st == "pending" || task_st == "delayed")
+            {
+                tasks_b2++;
+            }
+            if (task_st == "completed" || task_st == "canceled" || task_st == "failed")
+            {
+                tasks_b3++;
+            }
+        }
+
+    }
+}
+
+@functions {
+    List<int> isInCast(string username)
+    {
+        List<int> lstr = new List<int>();
+
+        foreach (var elem in Tasks)
+        {
+            List<string> task_members_lst = bc.getMultipleStringDecodingString(elem.task_members);
+            if (task_members_lst.Contains(username))
+            {
+                lstr.Add(elem.id);
+            }
+        }
+        return lstr;
+    }
+
+
+    List<int> isInAuthors(string username)
+    {
+        List<int> lstr = new List<int>();
+
+        foreach (var elem in Tasks)
+        {
+            if (elem.task_author.Equals(username))
+            {
+                lstr.Add(elem.id);
+            }
+        }
+        return lstr;
+    }
+
+
+}

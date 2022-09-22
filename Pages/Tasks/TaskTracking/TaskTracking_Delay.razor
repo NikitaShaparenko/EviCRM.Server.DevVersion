@@ -1,0 +1,157 @@
+﻿@using EviCRM.Server.Pages.Tasks;
+
+@inject SystemCore sc
+@inject BackendController bc
+@inject Context _context
+
+<div class="modal fade show" id="myModal" style="display:block; background-color: rgba(10,10,10,.8);" aria-modal="true" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">Перенос сроков выполнения задачи</h4>
+                <button type="button" class="close" @onclick="@ModalCancel">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group row mb-4">
+
+                    <label for="ttm_question_title">Почему вы хотите перенести сроки выполнения задачи?</label>
+                   
+                    <div class="list-group">
+
+  <button type="button" @onclick='(() => SendTOScriptCmd("DELAY_OTHERTASK"))' class="list-group-item list-group-item-action">Происходит наслоение других задач</button>
+  <button type="button" @onclick='(() => SendTOScriptCmd("DELAY_LACKTIME"))' class="list-group-item list-group-item-action">Не хватает времени на её выполнение</button>
+    <button type="button" @onclick='(() => SendTOScriptCmd("DELAY_FORCEM"))' class="list-group-item list-group-item-action">Произошёл форс-мажор</button>
+     <button type="button" @onclick='(() => SendTOScriptCmd("DELAY_NOMONEY"))' class="list-group-item list-group-item-action">Недостаточно финансирования</button>
+      <button type="button" @onclick='(() => SendTOScriptCmd("DELAY_GUILTYMEMBER"))' class="list-group-item list-group-item-action">Виноват другой(ие)</button>
+       <button type="button" @onclick='(() => SendTOScriptCmd("DELAY_OTHER"))' class="list-group-item list-group-item-action">Другая причина</button>
+</div>
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" @onclick="@ModalCancel">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code{
+    [Parameter]
+    public schema_tasks Current_Task { get; set; }
+
+     [Parameter]
+    public List<schema_users> Users { get; set; }
+
+    [Parameter]
+    public List<schema_divisions> Divisions { get; set; }
+
+}
+
+@code {
+
+      public string getUsernameByLogin(string login)
+    {
+        string fullname = "";
+
+        var elem = Users.FirstOrDefault(p => p.login == login);
+
+        if (elem != null)
+        {
+            fullname = elem.fullname;
+        }
+        return fullname;
+    }
+
+    [Parameter]
+    public string task_author { get; set; }
+
+    [Parameter]
+    public string task_id { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnClose { get; set; }
+
+
+    private Task ModalCancel()
+    {
+        return OnClose.InvokeAsync(false);
+    }
+
+    private Task ModalOk()
+    {
+        return OnClose.InvokeAsync(true);
+    }
+
+    public enum ModalDialogType
+    {
+        Ok,
+        OkCancel,
+        DeleteCancel
+    }
+
+    public async Task SendTOScriptCmd(string cmd)
+    {
+        TaskTrackingModelDelay ttmd = new TaskTrackingModelDelay();
+        ttmd.task_author = task_author;
+        ttmd.task_id = task_id;
+        ttmd.toscript_cmd = cmd;
+
+        string TOSCRIPT_CMD = "DELAY";
+
+        string task_author_to =  ttmd.task_author;
+        string task_id_to = ttmd.task_id;
+
+        string TOSCRIPT_VAR1 = ttmd.toscript_cmd;
+        string TOSCRIPT_VAR2 = "";
+
+        schema_task_tracking_main sttm = new()
+            {
+                task_variable1 = TOSCRIPT_VAR1,
+                task_variable2 = TOSCRIPT_VAR2,
+                task_variable3 = "",
+                task_author = task_author_to,
+                task_id = task_id_to,
+                task_cmd = TOSCRIPT_CMD,
+                task_datetime = DateTime.Now,
+            };
+
+        _context.TaskTrackingMain_Create(sttm);
+
+        string push_msg = "[Задача - " +  Current_Task.task_name + "] \n";
+        push_msg += "(Пользователь: " + getUsernameByLogin(task_author_to) + ") \n \n";
+        push_msg += "Пользователь запросил перенос сроков: \n";
+
+        switch(ttmd.toscript_cmd)
+        {
+            case "DELAY_OTHERTASK":
+                push_msg += "По причине: Наслоение других задач";
+                break;
+
+            case "DELAY_LACKTIME":
+                push_msg += "По причине: Не хватает времени на её выполнение";
+                break;
+
+            case "DELAY_FORCEM":
+                push_msg += "По причине: Произошёл форс-мажор";
+                break;
+
+            case "DELAY_NOMONEY":
+                push_msg += "По причине: Недостаточно финансирования";
+                break;
+
+            case "DELAY_GUILTYMEMBER":
+                push_msg += "По причине: Виноват другой(ие)";
+                break;
+
+            case "DELAY_OTHER":
+                push_msg += "По причине: Другая причина";
+                break;
+
+        }
+
+
+        await bc.SendTelegramMessage(push_msg, Current_Task, Users, Divisions);
+
+        await OnClose.InvokeAsync(true);
+    }
+}

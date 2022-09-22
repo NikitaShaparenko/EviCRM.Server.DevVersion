@@ -1,0 +1,229 @@
+﻿@inject AuthenticationStateProvider authStateProvider
+
+@if (ready)
+{
+    @if (modaleditioncrew_open)
+    {
+        <TaskTrackingCrewModal
+                       Users=@Users
+                       Selected_Users=Selected_Users
+                      
+                       task_id=@task_id_cookie
+
+                       OnChoosenUsers=@ModalEditionCrewOnCloseNew
+                       OnClose=@ModalEditionCrewOnClose
+
+                       user_=@user />
+    }
+
+    @if (modaleditiondivs_open)
+    {
+        <TaskTrackingDivsModal 
+                    Divisions=@Divisions
+                    Selected_Divisions=@Selected_Divisions
+        
+                    task_id=@task_id_cookie
+                       
+                    OnChoosenDivs=@ModalEditionDivOnCloseNew
+                       OnClose=@ModalEditionDivClose
+
+                       user_=@user/>
+    }
+
+    <div class="col-lg-4">
+        <div class="card border border-primary">
+
+            <div class="card-header bg-transparent border-primary" @onclick=ShowHideElement>
+                <h5 class="my-0 text-primary"><i class="mdi mdi-bullseye-arrow me-3"></i>Состав участников задачи</h5>
+            </div>
+
+             @if (isShowing)
+            {
+                                      
+            <div class="card-body">
+                <h5 class="card-title">Отделы</h5>
+
+                @if (Selected_Divisions != null)
+                {
+                    @if (Selected_Divisions.Count > 0)
+                    foreach(var elem in Selected_Divisions)
+                    {
+                        <p class="card-text"><i class="bx bx-face"></i>@elem.division_name</p>
+                    }
+                }
+            </div>
+
+            <div class="card-body">
+                <h5 class="card-title">Отдельные пользователи</h5>
+
+               @if (Selected_Users != null)
+                {
+                    @if (Selected_Users.Count > 0)
+                    foreach(var elem in Selected_Users)
+                    {
+                        <p class="card-text"><i class="bx bx-face"></i>@elem.fullname</p>
+                    }
+                }
+
+                @if (isAdmin)
+                {
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-info waves-effect waves-light" @onclick="ModalEditionCrewClick">Редактировать состав</button>
+                        <button type="button" class="btn btn-primary waves-effect waves-light" @onclick="ModalEditionDivClick">Редактировать отделы</button>
+                    </div>
+                }
+
+            </div>
+            }
+        </div>
+    </div>
+
+}
+@functions {
+
+    bool isShowing = true;
+
+    public void ShowHideElement()
+    {
+        isShowing = !isShowing;
+        StateHasChanged();
+    }
+
+    List<int> employees_load_choosen = new List<int>();
+    List<int> divs_load_choosen = new List<int>();
+
+    async void ModalEditionCrewOnCloseNew(List<schema_users> new_selected_users)
+    {
+        if (new_selected_users == null)
+        {
+            return;
+        }
+
+        List<string> workers = new List<string>();
+        Selected_Users.Clear();
+
+        foreach(var elem in new_selected_users)
+        {
+            Selected_Users.Add(elem);
+        }
+
+        await SetNewTaskUsers.InvokeAsync(Selected_Users);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    async void ModalEditionDivOnCloseNew(List<schema_divisions> new_selected_divs)
+    {
+         if (new_selected_divs == null)
+        {
+            return;
+        }
+
+        Selected_Divisions.Clear();
+
+        foreach(var elem in new_selected_divs)
+        {
+            Selected_Divisions.Add(elem);
+        }
+
+
+        await  SetNewTaskDivisions.InvokeAsync(Selected_Divisions);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    protected async override Task OnInitializedAsync()
+    {
+        modaleditioncrew_open = false;
+        modaleditiondivs_open = false;
+
+        user = authStateProvider.GetAuthenticationStateAsync().Result.User.Identity.Name;
+
+
+
+        ready = true;
+        await InvokeAsync(StateHasChanged);
+
+    }
+}
+
+@code {
+
+    string user { get; set; }
+
+    [Parameter]
+    public string task_id_cookie { get; set; }
+
+    [Parameter]
+    public List<schema_users> Users {get;set;}
+
+    [Parameter]
+    public List<schema_users> Selected_Users {get;set;}
+
+    [Parameter]
+    public List<schema_divisions> Divisions {get;set;}
+
+    [Parameter]
+    public List<schema_divisions> Selected_Divisions {get;set;}
+
+    [Parameter]
+public EventCallback<List<schema_users>> SetNewTaskUsers {get;set;}
+
+ [Parameter]
+public EventCallback<List<schema_divisions>> SetNewTaskDivisions {get;set;}
+
+    [Parameter]
+    public schema_users Current_User { get; set; }
+
+    [Parameter]
+    public bool isAdmin { get; set; }
+
+    [Parameter]
+    public string global_personal_status { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnCarouselRefresh { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnUserListRefresh { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnDivListRefresh {get;set;}
+
+    List<string> workers = new List<string>();
+    List<string> divs = new List<string>();
+
+    bool ready { get; set; }
+    bool modaleditioncrew_open { get; set; }
+    bool modaleditiondivs_open { get; set; }
+
+
+    #region Modal Functions
+
+    void ModalEditionCrewClick()
+    {
+        modaleditioncrew_open = true;
+        StateHasChanged();
+    }
+
+    void ModalEditionCrewOnClose()
+    {
+        modaleditioncrew_open = false;
+        OnUserListRefresh.InvokeAsync(true);
+        StateHasChanged();
+    }
+
+    void ModalEditionDivClick()
+    {
+        modaleditiondivs_open = true;
+        StateHasChanged();
+    }
+    void ModalEditionDivClose()
+    {
+        modaleditiondivs_open = false;
+         OnUserListRefresh.InvokeAsync(true);
+        StateHasChanged();
+    }
+
+    #endregion
+}
+
+

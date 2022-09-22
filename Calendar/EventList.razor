@@ -1,0 +1,42 @@
+@using BlazorCalendar.Models
+
+<div class="ms-depth-16 card">
+    <div class="card-content">
+        <h3 class="ms-fontSize-22 ms-fontWeight-regular">@SelectedDay.Date.ToString("D")</h3>
+        
+        @foreach (var item in SelectedDay.Events)
+        {
+            <div class="event shadow-effect @item.Color">
+                <h3 @onclick="()=>ShowSelect(item)" class="ms-fontSize-14 ms-fontWeight-regular">с @item.StartDate.ToString("HH:mm") до @item.EndDate.ToString("HH:mm")</h3>
+                <p class="ms-fontSize-14 ms-fontWeight-regular" @onclick="()=>ShowSelect(item)">@item.Subject</p> 
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public CalendarDay SelectedDay {get; set;}
+
+    protected override void OnInitialized(){
+        AddEvent.OnEventAdded += () => {
+            StateHasChanged();
+        };
+    }
+
+
+
+    public void ShowSelect(CalendarEvent cday)
+    {
+        DoTransferToEdit.InvokeAsync(cday);
+        StateHasChanged();
+    }
+
+  
+    schema_calendar_schedules scs = new();
+
+    [Parameter]
+    public EventCallback<CalendarEvent> DoTransferToEdit { get; set; }
+
+
+}

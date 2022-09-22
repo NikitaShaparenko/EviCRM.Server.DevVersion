@@ -1,0 +1,229 @@
+﻿@inject IJSRuntime JS
+@inject BackendController bc
+@inject SystemCore sc
+
+@inject Context _context
+
+<div class="modal fade show" id="myModal" style="display:block; background-color: rgba(10,10,10,.8);" aria-modal="true" role="dialog">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <h4 class="modal-title">Напомнить об актуальности задачи</h4>
+                <button type="button" class="close" @onclick="@ModalCancel">&times;</button>
+            </div>
+
+            <div class="modal-body">
+             
+                @if (ready)
+                {
+
+                <div class="form-group row mb-4">
+                    <label for="workers_list" class="col-form-label col-lg-2">Исполнителям:</label>
+                    <div class="col-lg-10">
+                        <Havit.Blazor.Components.Web.Bootstrap.HxMultiSelect 
+                        Label="Список исполнителей"
+                        TItem="@SelectData" 
+                        TValue="string" 
+                        Data="@select_data_personal" 
+                        @bind-Value="@SelectedValues_cast" 
+                        TextSelector="@((p) => p.Name)" 
+                        ValueSelector="@((p) => p.Id)" 
+                        EmptyText="Выберите одно или несколько значений"
+                        NullDataText="Загружаются значения..." />
+                    </div>
+
+                </div>
+
+                <div class="form-group row mb-4">
+                    <label for="workers_divs" class="col-form-label col-lg-2">Отделам:</label>
+                    <div class="col-lg-10">
+                        <Havit.Blazor.Components.Web.Bootstrap.HxMultiSelect 
+                        Label="Список отделов"
+                        TItem="@SelectData" 
+                        TValue="string" 
+                        Data="@select_data_divs" 
+                        @bind-Value="@SelectedValues_divs" 
+                        TextSelector="@((p) => p.Name)" 
+                        ValueSelector="@((p) => p.Id)" 
+                        EmptyText="Выберите одно или несколько значений" 
+                        NullDataText="Загружаются значения..." />
+                    </div>
+                    </div>
+
+                    }
+
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" @onclick=@ModalOk>Разослать уведомления</button>
+                <button type="button" class="btn" @onclick="@ModalCancel">Отмена</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@code{
+    [Parameter]
+    public schema_tasks Current_Task { get; set; }
+
+
+}
+
+@code{
+
+       public string getUsernameByLogin(string login)
+    {
+        string fullname = "";
+
+        var elem = Users.FirstOrDefault(p => p.login == login);
+
+        if (elem != null)
+        {
+            fullname = elem.fullname;
+        }
+        return fullname;
+    }
+}
+
+@code{
+
+    [Parameter]
+    public string task_id { get; set; }
+
+    [Parameter]
+    public string task_author { get; set; }
+
+    [Parameter]
+    public List<schema_users> Users { get; set; }
+
+    [Parameter]
+    public List<schema_divisions> Divisions { get; set; }
+
+    [Parameter]
+    public List<schema_users> Users_Selected { get; set;}
+
+    [Parameter]
+    public List<schema_divisions> Divisions_Selected { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnClose { get; set; }
+}
+
+    @code {
+
+    List<string> SelectedValues_divs = new List<string>();
+    List<string> SelectedValues_cast = new List<string>();
+
+    public class SelectData
+    {
+        public string Id { get; set; }
+
+        public string Name { get; set; }
+    }
+
+    private IList<SelectData> select_data_personal = new List<SelectData>();
+    private IList<SelectData> select_data_divs =  new List<SelectData>();
+
+    private Task ModalCancel()
+    {
+        return OnClose.InvokeAsync(false);
+    }
+
+    private async Task ModalOk()
+    {
+        string selected_option_str = bc.getMultipleStringEncodingString(SelectedValues_cast);
+
+        ViewModels.TaskTrackingModelNotify ttmn = new ViewModels.TaskTrackingModelNotify();
+
+        ttmn.task_author = task_author;
+        ttmn.task_id = task_id;
+        ttmn.ttm_cmd_remind_whom = SelectedValues_cast;
+
+        string TOSCRIPT_CMD = "NOTIFY";
+
+        string task_author_to = ttmn.task_author;
+        string task_id_to = ttmn.task_id;
+
+        List<string> str_lst = new List<string>();
+
+        if (ttmn.ttm_cmd_remind_whom.Count > 0)
+            foreach (string elem in ttmn.ttm_cmd_remind_whom)
+            {
+                str_lst.Add(elem);
+            }
+
+        string TOSCRIPT_VAR1 = bc.getMultipleStringEncodingString(str_lst);
+        string TOSCRIPT_VAR2 = "";
+
+        schema_task_tracking_main sttm = new()
+            {
+                task_variable1 = TOSCRIPT_VAR1,
+                task_variable2 = TOSCRIPT_VAR2,
+                task_variable3 = "",
+                task_author = task_author_to,
+                task_id = task_id_to,
+                task_cmd = TOSCRIPT_CMD,
+                task_datetime = DateTime.Now,
+            };
+
+        _context.TaskTrackingMain_Create(sttm);
+
+        string push_msg = "[Задача - " +  Current_Task.task_name + "] \n";
+        push_msg += "(Пользователь: " + getUsernameByLogin(task_author_to) + ") \n \n";
+        push_msg += "Отправлено напоминание участникам: \n";
+
+        await  bc.SendTelegramMessage(push_msg,Current_Task,Users,Divisions);
+
+        await OnClose.InvokeAsync(true);
+    }
+
+    bool ready = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        if (Divisions != null)
+        {
+            foreach(var elem in Divisions)
+            {
+                SelectData sd = new SelectData();
+                sd.Id = elem.id.ToString();
+                sd.Name = elem.division_name;
+                select_data_divs.Add(sd);
+            }
+        }
+
+        if (Users != null)
+        {
+            foreach(var elem in Users)
+            {
+                SelectData sd = new SelectData();
+                sd.Id = elem.id.ToString();
+                sd.Name = elem.fullname;
+                select_data_divs.Add(sd);
+            }
+        }
+
+        if (Divisions_Selected != null)
+        {
+            foreach (var elem in Divisions_Selected)
+            {
+                SelectedValues_divs.Add(elem.id.ToString());
+            }
+        }
+
+         if (Users_Selected != null)
+        {
+            foreach (var elem in Users_Selected)
+            {
+                SelectedValues_cast.Add(elem.id.ToString());
+            }
+        }
+
+            ready = true;
+            await InvokeAsync(StateHasChanged);
+
+   }
+}

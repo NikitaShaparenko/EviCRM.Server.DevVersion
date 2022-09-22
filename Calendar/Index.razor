@@ -1,0 +1,73 @@
+﻿@page "/calendar_new"
+@using BlazorCalendar.Core.CalendarExtensions
+@using BlazorCalendar.Models
+
+<link href="~/assets/css/calendar.css.css" rel="stylesheet">
+
+    <AuthorizeView>
+        <NotAuthorized>
+           
+        </NotAuthorized>
+    </AuthorizeView>
+
+<AuthorizeView>
+    <Authorized>
+        <div class="row">
+            <div class="col-sm-12 col-md-12 col-lg-9">
+                    <Calendar>
+                        <DayTemplate Context="day">
+                            @{
+                                string stringDayClass = day.BuildCssClasses(selectedDay);
+                            }
+                            <td>
+                                <div class="day shadow-effect @stringDayClass" @onclick="() => selectedDay = day" @key="day"> 
+                                    <h3 class="ms-fontSize-24 ms-fontWieght-regular">@day.DayNumber</h3>
+
+                                    @if (day.Events.Count > 0){
+                                        <div class="ms-fontSize-14 ms-fontWieght-regular notif-count-coll">
+                                            @day.Events.Count
+                                        </div>
+
+                                        @foreach (var item in day.Events.Take(MAX_ITEMS_THAT_FIT_DAY))
+                                        {
+                                            <CalendarEventComp calendarEvent="@item"></CalendarEventComp>
+                                        }
+
+                                        @if (day.Events.Count > MAX_ITEMS_THAT_FIT_DAY){
+                                            <div class="day-event">
+                                               У вас ещё скрыто + @(day.Events.Count - MAX_ITEMS_THAT_FIT_DAY) событий
+                                            </div>
+                                        }
+                                    }
+                                </div>
+                            </td>
+                        </DayTemplate>
+                    </Calendar>
+            </div>
+            <div class="col-sm-12 col-md-12 col-lg-3 event-panel">
+                <AddEvent SelectedDay="selectedDay" @ref="AddEventer"/>
+                <EventList SelectedDay="selectedDay" DoTransferToEdit=TransferEditHub />
+            </div>
+        </div>
+    </Authorized>
+</AuthorizeView>
+
+@code {
+
+    AddEvent AddEventer;
+
+
+    private int MAX_ITEMS_THAT_FIT_DAY = 2;
+    private CalendarDay selectedDay = new CalendarDay
+    {
+        Date = DateTime.Now
+    };
+
+    CalendarEvent ce_buffer = new();
+
+    public void TransferEditHub(CalendarEvent ce)
+    {
+        ce_buffer = ce;
+        AddEventer.EditEvent(ce);
+    }
+}

@@ -1,0 +1,335 @@
+﻿@inject Context _context
+
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Markdown - Доска</title>
+
+    <style>
+        .action_menu_top {
+            position: absolute;
+            right: 0;
+            top: 2;
+        }
+
+        .colored_borders {
+            left: 2;
+        }
+    </style>
+
+</head>
+
+
+<body>
+
+    <div class="card bg-info text-white-50">
+        <div class="card-body">
+            <div class="row" style="background-color:darkblue">
+
+                <p></p>
+
+                <h5><font color="white">@desk_title_name</font><button type="button" class="card-title btn btn-circle-top action_menu_top" width="10px" height="10px" @onclick=DeskContextMenuClick><font color="white">&#9776;</font></button></h5>
+
+                @if(ShowHideModal)
+                {
+                @if (isGlobalMenuShown)
+                {
+                    <div class="col">
+                        <div class="row">
+                            <button type="button" class="btn btn-outline-info" @onclick="(async()=>await AddCard())">Добавить карточку</button>
+                        </div>
+                       @* <div class="row">
+                            <button type="button" class="btn btn-outline-info" @onclick="(async()=>await SortCards())">Сортировать по ...</button>
+                        </div>*@
+                         <div class="row">
+                            <button type="button" class="btn btn-outline-info" @onclick="DelegateDesk">Делегировать доску</button>
+                        </div>
+                         <div class="row">
+                            <button type="button" class="btn btn-outline-info" @onclick="()=>ShowHide(false)">Скрыть доску</button>
+                        </div>
+                        
+                    </div>
+                }
+
+                <p></p>
+
+                @if (markdown_cards != null)
+                {
+                    @if (markdown_cards.Count > 0)
+                    {
+                    @foreach(var elem in markdown_cards)
+                    {
+                                <div class="col-lg-12">
+                                    @{
+                                        string card_backcolor = "";
+                                    }
+                        @if (elem.markdown_card_backcolor == "#00008B")
+                        {
+                                        card_backcolor = "7fd2f6";         
+                                    }
+                        else
+                        {
+                                    card_backcolor = elem.markdown_card_backcolor;
+                                }
+                    <div class="card" style="background-color:@card_backcolor">
+
+                        <div class="card-body">
+                            <font color="white"><h5 class="card-title mb-4" @onclick="()=>SelectCard(elem)">@elem.markdown_card_name<button type="button" class="card-title btn btn-circle-top action_menu_top" width="10px" height="10px" @onclick=ContextMenuClick>&#9776;</button></h5></font>
+
+                            @if (isMenuShown)
+                            {
+                                <div class="col">
+                                    <div class="row">
+                                        <button type="button" class="btn btn-outline-info" @onclick="()=>DelegateCard(elem)">Делегировать карточку</button>
+                                    </div>
+                                </div>
+                            }
+
+                            <img src="@elem.markdown_card_img_path" style="width:100%;height:200px" @onclick="()=>SelectCard(elem)" />
+                            <p></p>
+                            <h6>@elem.markdown_card_description</h6>
+                            <font color="black"> <span class="mdi mdi-clock" aria-hidden="true">Начало: @elem.markdown_card_date_start.ToString("dddd, dd MMMM yyyy")</span></font>
+                            <p></p>
+                            @if(DateTime.Now > elem.markdown_card_date_end)
+                                    {
+                                        <font color="white"><span style="background-color:#FF4B0F" class="mdi mdi-clock" aria-hidden="true"> @elem.markdown_card_date_end.ToString("dddd, dd MMMM yyyy")</span></font>
+                                    }
+                                    else
+                                    {
+                                        <font color="white"><span style="background-color:green" class="mdi mdi-clock" aria-hidden="true">  @elem.markdown_card_date_end.ToString("dddd, dd MMMM yyyy")</span></font>
+                                    }
+                                    <p></p>
+                                    <h6>Выполнено дел @CountTodosCompletedForCard(elem) / @CountTodosAllForCard(elem)</h6>
+                            
+
+
+                        </div>
+
+                    </div>
+                </div>
+                <p></p>
+                    }
+                     }
+                }
+
+                
+                <div class="col-lg-12">
+                    <div class="card" style="background-color:white">
+                        <div class="card-body">
+
+                            <button type="button" class="btn btn-outline-info form-control" @onclick="(async()=>await AddDesk())">Добавить доску</button>
+
+                        </div>
+                    </div>
+                </div>
+                }
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
+
+@code {
+
+    public void ShowHide()
+    {
+        ShowHideModal = !ShowHideModal;
+        StateHasChanged();
+    }
+
+    public void ShowHide(bool value)
+    {
+        ShowHideModal = value;
+        StateHasChanged();
+    }
+
+    bool ShowHideModal = true;
+
+    /// <summary>
+    /// Event Handlers
+    /// </summary>
+
+    [Parameter]
+    public int desk_num { get; set; }
+
+    [Parameter]
+    public EventCallback<Markdown_TwoWayDesksBindings> OnDelegateDesk { get; set; }
+
+    [Parameter]
+    public EventCallback<MarkdownCard_TwoWayDesksBindings> OnDelegateCard{ get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnCreateDesk { get; set; }
+
+    [Parameter]
+    public EventCallback<Markdown_TwoWayDesksBindings> OnCreateCard { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnSorting { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnCopyingCard { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnMovingCard { get; set; }
+
+    [Parameter]
+    public EventCallback<MarkdownCard_TwoWayDesksBindings> OnSelectCard { get; set; }
+
+    [Parameter]
+    public List<schema_markdown_cards> markdown_cards { get; set; }
+
+    [Parameter]
+    public schema_markdown_desks markdown_desk { get; set; }
+
+    [Parameter]
+    public string desk_title_name { get; set; }
+
+    enum Desk_Option
+    {
+        View,
+        Create,
+    }
+
+    Desk_Option desk_status = Desk_Option.View; 
+
+    public void DelegateDesk()
+    {
+        Markdown_TwoWayDesksBindings mdtib = new();
+        mdtib.Desk = markdown_desk;
+        mdtib.desk_num = desk_num;
+        OnDelegateDesk.InvokeAsync(mdtib);
+    }
+
+    public void DelegateCard(schema_markdown_cards card)
+    {
+        MarkdownCard_TwoWayDesksBindings mctwdb = new();
+        mctwdb.Card = card;
+        mctwdb.desk_num = desk_num;
+        OnDelegateCard.InvokeAsync(mctwdb);
+    }
+
+
+    public int CountTodosCompletedForCard(schema_markdown_cards card)
+    {
+        int num = 0;
+        var elem_lst = _context.markdown_todo_list.Where(p=>p.markdown_todo_cardid == card.idmarkdown_cards && p.markdown_todo_checked == true).ToList();
+
+        if (elem_lst != null)
+        {
+            num = elem_lst.Count;
+        }
+        return num;
+
+    }
+
+    public void SelectCard(schema_markdown_cards card)
+    {
+        MarkdownCard_TwoWayDesksBindings mctwdb = new();
+        mctwdb.Card = card;
+        mctwdb.desk_num = desk_num;
+
+        var elem_todos = _context.markdown_todo_list.Where(p=>p.markdown_todo_cardid == card.idmarkdown_cards).ToList();
+
+        if (elem_todos != null)
+        {
+            if (elem_todos.Count > 0)
+            {
+                mctwdb.Todos = new();
+
+                foreach(var elem in elem_todos)
+                {
+                    mctwdb.Todos.Add(elem);
+                }
+            }
+        }
+        OnSelectCard.InvokeAsync(mctwdb);
+    }
+
+    public int CountTodosAllForCard(schema_markdown_cards card)
+    {
+        int num = 0;
+        var elem_lst = _context.markdown_todo_list.Where(p=>p.markdown_todo_cardid == card.idmarkdown_cards).ToList();
+
+        if (elem_lst != null)
+        {
+            num = elem_lst.Count;
+        }
+        return num;
+    }
+
+
+    private async Task Markdown(int i)
+    {
+        //Markdown_Desk_TwoIntBindings tib = new Markdown_Desk_TwoIntBindings();
+        //tib.index = desk_num;
+        //tib.parameter = i;
+        //await OnMarkdown.InvokeAsync(tib);
+    }
+
+    private async Task KillCardMarkdown(int i)
+    {
+        //Markdown_Desk_TwoIntBindings tib = new Markdown_Desk_TwoIntBindings();
+        //tib.index = desk_num;
+        //tib.parameter = i;
+        //await OnKillMarkdown.InvokeAsync(tib);
+    }
+
+    private async Task AddCard()
+    {
+        Markdown_TwoWayDesksBindings desk = new();
+        desk.desk_num = desk_num;
+        desk.Desk = markdown_desk;
+
+        await OnCreateCard.InvokeAsync(desk);
+    }
+
+    private async Task AddDesk()
+    {
+
+        desk_status = Desk_Option.Create;
+        await InvokeAsync(StateHasChanged);
+
+        await OnCreateDesk.InvokeAsync(desk_num);
+    }
+
+    private async Task SortCards()
+    {
+        await OnSorting.InvokeAsync(desk_num);
+    }
+
+    private async Task CopyCard()
+    {
+        await OnCopyingCard.InvokeAsync(desk_num);
+    }
+
+    private async Task MoveCard()
+    {
+        await OnMovingCard.InvokeAsync(desk_num);
+    }
+
+
+
+
+
+
+    bool isMenuShown = false;
+
+    bool isGlobalMenuShown = false;
+
+
+    void DeskContextMenuClick()
+    {
+        ShowHideModal = true;
+        isGlobalMenuShown = !isGlobalMenuShown;
+        StateHasChanged();
+    }
+
+    void ContextMenuClick()
+    {
+        isMenuShown = !isMenuShown;
+        StateHasChanged();
+    }
+
+}

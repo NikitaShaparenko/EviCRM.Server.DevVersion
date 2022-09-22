@@ -1,0 +1,1683 @@
+﻿@page "/task_tracking"
+
+@using Microsoft.AspNetCore.SignalR.Client
+
+@using System.Collections.Generic;
+@using System.Net
+@using EviCRM.Server.Models
+@using EviCRM.Server.ViewModels
+@using System.Net.Sockets
+@using System.Globalization
+
+@using EviCRM.Server.Core
+@using EviCRM.Server.Pages.Tasks;
+
+@using Majorsoft.Blazor.Extensions.BrowserStorage
+
+@using System.Web.Mvc
+
+@inject NavigationManager UriHelper
+@inject ILocalStorageService localStorage
+@inject AuthenticationStateProvider authStateProvider
+@inject IToastService _toastService;
+@inject NavigationManager NavigationManager  
+
+<h5>Задачи \ Отслеживание задачи</h5>
+<PageTitle>Задачи \ Отслеживание задачи</PageTitle>
+
+<style>
+
+    .dont-break-out {
+        /* These are technically the same, but use both */
+        overflow-wrap: break-word;
+        word-wrap: break-word;
+        -ms-word-break: break-all;
+        /* This is the dangerous one in WebKit, as it breaks things wherever */
+        word-break: break-all;
+        /* Instead use this non-standard one: */
+        word-break: break-word;
+        /* Adds a hyphen where the word breaks, if supported (No Blink) */
+        -ms-hyphens: auto;
+        -moz-hyphens: auto;
+        -webkit-hyphens: auto;
+        hyphens: auto;
+    }
+
+    .wordwrap {
+        word-wrap: break-word; /* Перенос слов */
+    }
+
+    .container {
+        border: 1px solid #000000;
+        height: 300px;
+    }
+
+        .container textarea {
+            border: 1px solid red;
+            height: 100%;
+        }
+
+    /* Important part */
+    .modal-dialog {
+        overflow-y: initial !important
+    }
+
+    .modal-body {
+        max-height: calc(100vh - 200px);
+        overflow-y: auto;
+    }
+</style>
+
+@inject IWebHostEnvironment _env
+
+@inject Context _context
+@inject BackendController bc
+@inject Sentinel sentinel
+@inject SystemCore sc
+
+<AuthorizeView>
+    <Authorized>
+
+        @if (!ready)
+        {
+            <h6><i class="bx bx-buoy bx-spin text-primary display-3"></i> Задача загружается, подождите пожалуйста </h6>
+        }
+        else
+        {
+           
+            @if (task_id_cookie == null || task_id_cookie == "")
+            {
+                <EviCRM.Server.Pages.Tasks.TaskTracking.TaskTracking_ErrorModal
+                OnClose=@ErrorModalHandler />
+            }
+            else
+            {
+
+                <!--Модальные окна-->
+                @if (modalRemindOpened)
+                {
+                    <EviCRM.Server.Pages.Tasks.TaskTracking.TaskTracking_RemindBoard 
+                    
+                    task_author=@user_
+                    task_id=@task_id.ToString()
+                   
+                    OnClose="OnRemindBoardClosed" 
+                    
+                    Divisions=@Divisions
+                    Divisions_Selected=@DivisionsInTask
+          Current_Task=Current_Task
+                                    
+                    Users=@Users
+                    Users_Selected=@UsersInTask
+                    
+                    />
+                }
+                <!-- Модальное окно завершения задачи как провал -->
+                @if (modalCloseFailedOpened)
+                {
+                    <EviCRM.Server.Pages.Tasks.TaskTracking.TaskTracking_MarkAsFault
+                    Current_Task=Current_Task
+                                    Divisions=Divisions
+                                    Users=Users
+                    task_author=@task_id_cookie
+                    task_id=@task_id.ToString()
+                    OnClose="OnCloseFailClosed"
+   
+                    OnOk="OnOkFailClosed" />
+                }
+                @if (modalRevisionOpened)
+                {
+                    <EviCRM.Server.Pages.Tasks.TaskTracking.TaskTracking_Revision
+                    Current_Task=Current_Task
+                                    Divisions=Divisions
+                                    Users=Users
+                    task_started=Current_Task.task_startdate
+                    task_ended=Current_Task.task_enddate
+                    OnTaskStatusUpdate="OnUpdateRevision"
+                    SelectedDivisions=@DivisionsInTask
+                    SelectedUsers=@UsersInTask
+                   
+                    
+                    OnClose="OnCloseRevisionClosed"
+                    
+                    task_author=@user_
+                    task_id=@task_id.ToString()/>
+                }
+                @if (modalDateChangeOpened)
+                {
+                    <EviCRM.Server.Pages.Tasks.TaskTracking.TaskTracking_ModalDatesChange
+                    Current_Task=Current_Task
+                                    Divisions=Divisions
+                                    Users=Users
+                    task_author=@task_id_cookie
+                    task_id=@task_id.ToString()
+                    modal_dt_start=@Current_Task.task_startdate
+                    modal_dt_end=@Current_Task.task_enddate
+                   
+                    OnClose=@OnCloseDateChanger
+                    OnTaskStatusUpdate=TaskStatusUpdate />
+                }
+
+                @if (task_id_cookie != null && ready)
+                {
+                    <div class="row">
+
+                        <!--Панель управления-->
+
+                     <div class="col-lg-4">
+                            <div class="card bg-primary text-white-50">
+                                <div class="card-header bg-transparent border-primary"  @onclick="ShowHideBio">
+                <h5 class="my-0 text-primary text-white"><i class="mdi mdi-bullseye-arrow me-3"></i>Основные сведения:</h5>
+            </div>
+                                <div class="card-body">
+                                    @if (ShowHideBioShown)
+                                    {
+                                  
+                                     @if (TaskEditMode)
+                                        {
+                                             <p><input type="text" @bind="Current_Task.task_name"></p>
+                                        }
+                                        else
+                                        {
+                                              <p><h5 class="mb-4 text-white">Задача: @Current_Task.task_name</h5></p>
+                                        }
+
+                                    <p><h5 style="color:white"><i class="bx bx-code-block"></i> Описание задачи: </h5></p>
+
+                                    @if (TaskEditMode)
+                                        {
+                                              <font color="white">
+                                           <RichTextEdit @ref="task_description"
+                                                      Theme="RichTextEditTheme.Snow"
+                                                      ContentChanged="@OnContentChanged_taskDescription"
+                                                      PlaceHolder="Введите текст изменений"
+                                                      ReadOnly="false"
+                                                      SubmitOnEnter="false"
+                                                      EnterPressed="@OnSave_taskDescription"
+                                                      ToolbarPosition="Placement.Top">
+                                                <Editor></Editor>
+                                                <Toolbar>
+                                                    <RichTextEditToolbarGroup>
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.Bold" />
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.Italic" />
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.Align" />
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.Blockquote" />
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.Header" />
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.Strike" />
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.Underline" />
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.Align" />
+
+                                                        <RichTextEditToolbarSelect Action="RichTextEditAction.Size">
+                                                            <RichTextEditToolbarSelectItem Value="small" />
+                                                            <RichTextEditToolbarSelectItem Selected />
+                                                            <RichTextEditToolbarSelectItem Value="large" />
+                                                            <RichTextEditToolbarSelectItem Value="huge">Very Big</RichTextEditToolbarSelectItem>
+                                                        </RichTextEditToolbarSelect>
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.List" Value="ordered" />
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.List" Value="bullet" />
+                                                    </RichTextEditToolbarGroup>
+                                                <RichTextEditToolbarGroup Float="Float.End">
+                                                        <Button Clicked="@OnSave_taskDescription"><Icon Name="IconName.Save" /></Button>
+                                                    </RichTextEditToolbarGroup>
+                                                </Toolbar>
+                                            </RichTextEdit>
+                                            </font>
+                                        }
+                                        else
+                                        {
+
+                                        
+                                    <h6 style="color:white">
+                                        <b>
+                                            <p>
+                                                    @((MarkupString)Current_Task.task_description)
+                                                </p>
+                                        </b>
+                                    </h6>
+                                    }
+
+                                    <p></p>
+
+                                    @if (TaskEditMode)
+                                        {
+                                            <p><h5 class="mb-4 text-white">Бюджет : </h5><input type="text" @bind="@Current_Task.task_budget"></p>
+                                        }
+                                        else
+                                        {
+                                             <p><h5 class="mb-4 text-white">Бюджет: @Current_Task.task_budget</h5></p>
+                                        }
+
+                                    <p></p>
+
+                                    <!-- Проверка статуса задачи -->
+                                    @switch (Current_Task.task_status)
+                                    {
+                                        case "waiting":
+                                            <p class="card-text text-white"><h5 style="color:white"><i class="bx bx-book-bookmark"></i> Состояние задачи: </h5><h5 style="color:white">Ожидает подтверждения</h5></p>
+                                            break;
+
+                                        case "approved":
+                                            <p class="card-text text-white"><h5 style="color:white"><i class="bx bx-book-bookmark"></i> Состояние задачи: </h5><h5 style="color:lightblue">Подтверждена</h5></p>
+                                            break;
+
+                                        case "pending":
+                                            <p class="card-text text-white"><h5 style="color:white"><i class="bx bx-book-bookmark"></i> Состояние задачи: </h5><h5 style="color:green">Выполняется</h5></p>
+                                            break;
+
+                                        case "delayed":
+                                            <p class="card-text text-white"><h5 style="color:white"><i class="bx bx-book-bookmark"></i> Состояние задачи: </h5><h5 style="color:red">Просрочена</h5></p>
+                                            break;
+
+                                        case "completed":
+                                            <p class="card-text text-white"><h5 style="color:white"><i class="bx bx-book-bookmark"></i> Состояние задачи: </h5><h5 style="color:green">Выполнена</h5></p>
+                                            break;
+
+                                        case "canceled":
+                                            <p class="card-text text-white"><h5 style="color:white"><i class="bx book-bookmark"></i> Состояние задачи: </h5><h5 style="color:red">Отменена</h5></p>
+                                            break;
+
+                                        case "failed":
+                                            <p class="card-text text-white"><h5 style="color:white"><i class="bx book-bookmark"></i> Состояние задачи: </h5><h5 style="color:red">Провалена</h5></p>
+                                            break;
+
+                                        default:
+                                            <p class="card-text text-white"><h5 style="color:white"><i class="bx book-bookmark"></i> Состояние задачи: </h5><h5 style="color:blue">Задача создана</h5></p>
+
+                                            break;
+
+                                    }
+
+                                    <!--Проверка персонального статуса-->
+                                    @switch (global_personal_status)
+                                    {
+                                        case "waiting":
+                                            <h5 style="color:white"><i class="bx book-bookmark"></i>Моя лепта: <span class="badge rounded-pill badge-secondary font-size-11">Ожидает подтверждения</span></h5>
+                                            break;
+
+                                        case "approved":
+                                            <h5 style="color:white"><i class="bx book-bookmark"></i>Моя лепта: <span class="badge rounded-pill badge-info font-size-11">Подтверждено</span> </h5>
+                                            break;
+
+                                        case "pending":
+                                            <h5 style="color:white"><i class="bx book-bookmark"></i>Моя лепта: <span class="badge rounded-pill badge-success font-size-11">Выполняется</span> </h5>
+                                            break;
+
+                                        case "delayed":
+                                            <h5 style="color:white"><i class="bx book-bookmark"></i>Моя лепта: <span class="badge rounded-pill badge-danger font-size-11">Просрочена</span> </h5>
+                                            break;
+
+                                        case "completed":
+                                            <h5 style="color:white"><i class="bx book-bookmark"></i>Моя лепта: <span class="badge rounded-pill bg-success font-size-11">Выполнена</span> </h5>
+                                            break;
+
+                                        case "canceled":
+                                            <h5 style="color:white"><i class="bx book-bookmark"></i>Моя лепта: <span class="badge rounded-pill bg-danger  font-size-11">Отменена</span></h5>
+                                            break;
+
+                                        case "failed":
+                                            <h5 style="color:white"><i class="bx book-bookmark"></i>Моя лепта: <span class="badge rounded-pill bg-danger  font-size-11">Провалена</span></h5>
+                                            break;
+                                    }
+
+                                    <!--Загрузка автора задачи-->
+                                   
+                                        <p class="card-text text-white"><h5 style="color:white"><i class="bx bx-male"></i>Автор задачи: @user_model.fullname</h5></p>
+
+                                    <!-- Загрузка связанных проектов -->
+                                    @if (Projects.Count > 0)
+                                    {
+                                        <p class="card-text text-white"><h5 style="color:white"><i class="bx bx-card"></i>Проекты связанные с задачей: </h5></p>
+                                        <ul>
+
+                                            @foreach (var strc in Projects)
+                                            {
+                                                <li><p class="card-text text-white"><h5 style="color:white"><i class="bx bx-card"> @strc.proj_name</i></h5></p></li>
+                                            }
+
+                                        </ul>
+                                    }
+
+                                    <!-- Загрузка даты начала выполнения -->
+                                    
+                                     <p class="card-text text-white"><h5 style="color:white"><i class="bx bx-calendar-event"></i>Дата начала: @Current_Task.task_startdate.ToShortDateString() </h5></p>
+
+
+                                     <!-- Загрузка даты конца выполнения -->
+                                   
+                                        <p class="card-text text-white"><h5 style="color:white"><i class="bx bx-check-square"></i>Дата окочания: @Current_Task.task_enddate.ToShortDateString()</h5></p>
+                
+
+                                   
+                                        TimeSpan ts = (Current_Task.task_enddate - DateTime.Now);
+                                        TimeSpan ts2 = (Current_Task.task_enddate - DateTime.Now);
+                                        bool is_delay = false;
+                                        if (ts.TotalSeconds > 0)
+                                        {
+                                            ts2 = ts;
+                                            is_delay = false;
+                                        }
+                                        else
+                                        {
+                                            ts2 = ts.Negate();
+                                            is_delay = true;
+                                        }
+                                        
+                                 
+                                    
+                                    <!--Загрузка обратного отсчёта-->
+                                    @if (!is_delay)
+                                    {
+                                        <p style="color:white; background-color:green;">Осталось @ts.Days дней @ts.Hours часов @ts.Minutes минут @ts.Seconds секунд </p>
+                                    }
+                                    else
+                                    {
+                                        <p style="color:white; background-color:red;">Просрочена на @ts2.Days дней @ts2.Hours часов @ts2.Minutes минут @ts2.Seconds секунд </p>
+                                    }
+
+                                    <!-- Админ меню управления -->
+                                    @if (isAdmin)
+                                    {
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <button type="button" class="btn btn-secondary waves-effect waves-light" @onclick="ModalDatesChangeOpen">Изменить даты</button>
+                                           
+                                             @if (TaskEditMode)
+                                            {
+                                                <button type="button" class="btn btn-primary-outline waves-effect waves-light" @onclick="TaskEdit">Сохранить изменения</button>
+                                                <button type="button" class="btn btn-outline-info waves-effect waves-light" @onclick="TaskEditCancel">Отменить изменения</button>
+                                            }
+                                            else
+                                            {
+                                                <button type="button" class="btn btn-secondary waves-effect waves-light" @onclick="TaskEdit">Изменить задачу</button>
+                                            }
+                                            
+
+                                            @if (current_task_status == "pending")
+                                            {
+                                                <button type="button" class="btn btn-success waves-effect waves-light" @onclick="ModalBeforeHeadOpen">Досрочно закрыть</button>
+                                            }
+                                            <button type="button" class="btn btn-outline-info waves-effect waves-light" @onclick="ModalRemindOpen">Напомнить</button>
+                                           
+                                            @if (current_task_status == "delayed")
+                                            {
+                                                <button type="button" class="btn btn-danger waves-effect waves-light" @onclick="ModalCloseFailedOpen">Закрыть как провал</button>
+                                            }
+                                            @if (current_task_status == "completed" || current_task_status == "canceled" || current_task_status == "failed")
+                                            {
+                                                <button type="button" class="btn btn-secondary waves-effect waves-light" @onclick="ModalRevisionOpen">Вернуть на доработку</button>
+                                            }
+                                            <button type="button" class="btn btn-outline-danger waves-effect waves-light" @onclick="UpdateTaskTrackingCarousel">Обновить ленту</button>
+
+                                        </div>
+                                    }
+
+}
+                                </div>
+                            </div>
+                        </div>
+
+
+                        <!-- Карта целей а-ля Трелло -->
+
+                       @* <EviCRM.Server.Pages.Tasks.TaskTracking.TaskTracking_CardMarkdown users_dt=@users_dt fullname_dt=@fullname_dt card_delegate=card_delegate_dt OnCarouselRefresh=@UpdateTaskTrackingCarousel global_personal_status=@global_personal_status task_id=@task_id.ToString() card_body=@card_body card_id=@card_id card_marksdown=@card_marksdown isAdmin=@isAdmin task_implementer=@user_ />
+*@
+                        <!-- Навбар пользователей -->
+                        @if (task_id_cookie != null && task_id_cookie != "" && ready)
+                        {
+                            <EviCRM.Server.Pages.Tasks.TaskTracking.TaskTracking_UserNavbar 
+                            OnCarouselRefresh=@UpdateTaskTrackingCarousel
+                           
+                            global_personal_status=@global_personal_status 
+
+                            task_id_cookie=@task_id_cookie 
+
+                            Current_User=@user_model
+                            Users=@Users
+                            Divisions=@Divisions
+
+                          OnDivListRefresh=@OnDivListRefresh
+                          Selected_Divisions=@DivisionsInTask
+                          Selected_Users=@UsersInTask
+                          SetNewTaskDivisions=SetNewTaskDivision
+                          SetNewTaskUsers=SetNewTaskUsers
+                          isAdmin=@isAdmin
+                          
+                          />
+                        }
+
+                        @if (task_id_cookie != null && task_id_cookie != "" && ready)
+                        {
+                           <EviCRM.Server.Pages.Tasks.TaskTracking.TaskTracking_Notes
+                           task_id=@task_id_cookie />
+                        }
+
+
+                        @if (isMarkdownCardHistoryShown)
+                        {
+                          <EviCRM.Server.Pages.Tasks.Markdown.Markdown_History 
+                          Card=MarkdownHistoryCard
+                          OnClose=OnMarkdownHistoryClosed
+                          Users=Users
+                          />
+                        }
+
+                        @if (task_id_cookie != null && task_id_cookie != "" && ready)
+                        {
+                          <EviCRM.Server.Pages.Tasks.Markdown.Markdown_General
+
+                          OnToastHandler=@ShowCustomNotification
+                          Markdown_Cards=@Markdown_Cards
+                          Markdown_Desks=@Markdown_Desks
+                          Markdown_Todos=@Markdown_Todos
+                          User=@user_model
+                          Users=@Users
+                          task_id=@task_id 
+                          isAdmin=isAdmin
+
+                          Divisions=Divisions
+                          
+                          doCreateDesk=@ContextHandler_CreateMarkdownDesk
+                          doCreateCardWithTodos=@ContextHandler_CreateMarkdownCard
+                          
+                          doUpdateCard=@ContextHandler_UpdateCard
+                          doUpdateCardWithTodos=@ContextHandler_UpdateCardWithTodos
+                          doUpdateDesk=@Context_Handler_UpdateDesk
+                          doDelegateCard=@Context_Handler_DelegateCard
+                          doDelegateDesk=@Context_Handler_DelegateDesk
+                          doRemoveCard=@Context_Handler_RemoveCard
+
+                          doHistory=@ContextHandler_CallHistory
+
+                          />
+                        }
+
+                       
+
+                    </div>
+
+                    <!-- Подтверждение начала выполнения задачи -->
+                    @if (global_personal_status == "waiting")
+                    {
+                        <div class="row">
+                            <div class="col-lg-6">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h4 class="card-title mb-3">Необходимо подтвердить начало выполнение задачи!</h4>
+                                        <h4>Система будет считать, что вы приступили к заданию, сразу после подтверждения</h4>
+                                        <b>Если всё устраивает, то нажмите кнопку:</b>
+                                        <button type="button" class="btn btn-outline-primary" @onclick="RogueConfirm">Начал(а) выполнять задачу</button>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+
+                    @if (task_tracking_carousel_loaded)
+                    {
+                        <div class="row">
+                            <div class="col-lg-12">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h4 class="card-title mb-5">Хронология событий</h4>
+                                        <div class="">
+                                            <ul class="verti-timeline list-unstyled">
+                                                
+                                                @if (TaskTrackingMain.Count > 0)
+                                                {
+                                                        @foreach(var elem in TaskTrackingMain)
+                                                        {
+                                                            string toscript_cmd = elem.task_cmd;
+
+                                                            @switch(toscript_cmd)
+                                                            {
+                                                                case "CREATE":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bx bxs-plus-square h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="flex-grow-1">
+                                                                                <div>
+                                                                                    <h5>Задача создана</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                </div>
+                                                                               
+                                                                            </div>
+                                                                           
+                                                                        </div>
+
+                                                                    </li>
+
+                                                                    break;
+                                                                case "COMPLETE":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bx-task h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="flex-grow-1">
+                                                                                <div>
+                                                                                    <h5>Задача заверешена в срок</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+
+                                                                    break;
+                                                                case "COMPLETEBEFOREHAND":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bx-task h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="flex-grow-1">
+                                                                                <div>
+                                                                                    <h5>Задача заверешена заблаговременно</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+                                                                    break;
+                                                                case "COMPLETEDELAY":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bx-task h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="flex-grow-1">
+                                                                                <div>
+                                                                                    <h5>Задача заверешена с задержкой</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+                                                                    break;
+                                                                case "CANCELED":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bx-bx-error-alt h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="flex-grow-1">
+                                                                                <div>
+                                                                                    <h5>Задача отменена</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+                                                                    break;
+                                                                case "DELAY":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bx-timer h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="flex-grow-1">
+                                                                                <div>
+                                                                                    <h5>Задача отложена по срокам</h5>
+                                                                                    @{
+                                                                                        switch (elem.task_variable1)
+                                                                                        {
+                                                                                            case "OTHERTASK":
+                                                                                                <h5>Ввиду других задач</h5>
+                                                                                                break;
+
+                                                                                            case "LACKTIME":
+                                                                                                <h5>Ввиду нехватки времени</h5>
+                                                                                                break;
+
+                                                                                            case "FORCEM":
+                                                                                                <h5>Ввиду форс-мажора</h5>
+                                                                                                break;
+
+                                                                                            case "NOMONEY":
+                                                                                                <h5>Ввиду нехватки финансирования</h5>
+                                                                                                break;
+
+                                                                                            case "GUILTYMEMBER":
+                                                                                                <h5>Ввиду вины другого исполнителя</h5>
+                                                                                                break;
+
+                                                                                            case "OTHER":
+                                                                                                <h5>Ввиду других причин</h5>
+                                                                                                break;
+                                                                                        }
+                                                                                    }
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+                                                                    break;
+                                                                case "NOSIR":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bxs-no-entry h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="flex-grow-1">
+                                                                                <div>
+                                                                                    <h5>Пользователь отказался выполнять задачу</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+                                                                    break;
+                                                                case "PAUSE":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bx-timer h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="flex-grow-1">
+                                                                                <div>
+                                                                                    <h5>Задачу поставили на паузу</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+                                                                    break;
+                                                                case "FAIL":
+
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bx-error-circle h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="flex-grow-1">
+                                                                                <div>
+                                                                                    <h5>Задача провалена</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author) => </p>
+
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+                                                                    break;
+                                                                case "ADDMEMBER":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bxs-user-plus h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="flex-grow-1">
+                                                                                <div>
+                                                                                    <h5>Пользователь добавил участника</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <h5 class="card-text text-black-50">@((MarkupString)sentinel.TripleDesDecrypt(elem.task_variable1))</h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+                                                                    break;
+
+                                                                     case "ADDDIV":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bxs-user-plus h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="flex-grow-1">
+                                                                                <div>
+                                                                                    <h5>Пользователь добавил отдел</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <h5 class="card-text text-black-50">@((MarkupString)getDivByDivID(sentinel.TripleDesDecrypt(elem.task_variable1)).division_name)</h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+                                                                    break;
+                                                                case "KILLMEMBER":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bxs-user-minus h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="flex-grow-1">
+                                                                                <div>
+                                                                                    <h5>Пользователь исключил участника</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <h5 class="card-text text-black-50">@((MarkupString)elem.task_variable1)</h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+                                                                    break;
+                                                                case "COMMIT":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bx-error-circle h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="col-lg-4">
+                                                                                <div class="card bg-primary text-white-50">
+                                                                                    <div class="card-body">
+                                                                                        <h5 class="mb-4 text-white"><i class="bx bxs-face me-3"></i>Новые изменения</h5>
+                                                                                        <h5 class="card-text text-black-50">@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</h5>
+                                                                                        <p class="card-text text-white">@elem.task_variable1</p>
+                                                                                        <p class="card-text text-white">@((MarkupString)elem.task_variable2)</p>
+                                                                                        <div class="avatar-group">
+
+                                                                                            @{
+                                                                                                List<string> cast = bc.getMultipleStringDecodingString(elem.task_variable3);
+                                                                                                List<string> users_avatars_lst = new List<string>();
+
+                                                                                                foreach (string elem2 in cast)
+                                                                                                {
+                                                                                                    users_avatars_lst.Add(getUserByUserID(elem2).avatar);
+                                                                                                }
+
+                                                                                                for (int av = 0; av < cast.Count; av++)
+                                                                                                {
+                                                                                                    if (users_avatars_lst[av] == "" || users_avatars_lst[av] == null)
+                                                                                                    {
+                                                                                                        string str = cast[av].ToUpper();
+                                                                                                        char b_str = '?';
+
+                                                                                                        if (str.Length > 0)
+                                                                                                        {
+                                                                                                            b_str = str[0];
+                                                                                                        }
+
+                                                                                                        <div class="avatar-group-item">
+                                                                                                            <a href="javascript: void(0);" class="d-inline-block">
+                                                                                                                <div class="avatar-xs">
+                                                                                                                    <span class="avatar-title rounded-circle bg-danger text-white font-size-16">
+
+                                                                                                                        @b_str
+
+                                                                                                                    </span>
+                                                                                                                </div>
+                                                                                                            </a>
+                                                                                                        </div>
+                                                                                                    }
+                                                                                                    else
+                                                                                                    {
+                                                                                                        if (File.Exists(Path.Combine(_env.WebRootPath, "uploads", "users", "avatars", users_avatars_lst[av])))
+                                                                                                        {
+                                                                                                            <div class="avatar-group-item">
+                                                                                                                <a href="javascript: void(0);" class="d-inline-block">
+                                                                                                                    <div class="avatar-xs">
+                                                                                                                        <img src="/uploads/users/avatars/@users_avatars_lst[av]" alt="" class="avatar-xs" />
+                                                                                                                    </div>
+                                                                                                                </a>
+                                                                                                            </div>
+                                                                                                        }
+                                                                                                        else
+                                                                                                        {
+                                                                                                            <div class="avatar-group-item">
+                                                                                                                <a href="javascript: void(0);" class="d-inline-block">
+                                                                                                                    <div class="avatar-xs">
+                                                                                                                        <img src="/uploads/users/avatars/default.png" alt="" class="avatar-xs" />
+                                                                                                                    </div>
+                                                                                                                </a>
+                                                                                                            </div>
+                                                                                                        }
+                                                                                                    }
+                                                                                                }
+
+                                                                                            }
+                                                                                        </div>
+
+                                                                                        <div class="card">
+                                                                                            <input type="text" class="form-control" name="text-@elem.id" id="text-@elem.id" placeholder="Прокомментировать"/>
+                                                                                            <button type="button" class="btn btn-primary" name="button-@elem.id" id="buton-@elem.id">Отправить</button>
+                                                                                        </div>
+
+
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+
+
+                                                                    break;
+                                                                case "ADDATTACHMENTS":
+
+                                                                    List<string> lst_string = new List<string>();
+                                                                    lst_string = bc.getMultipleStringDecodingString(elem.task_variable2);
+
+                                                                    List<string> lst_string_wl = new List<string>();
+                                                                    lst_string_wl = bc.getMultipleStringDecodingString(elem.task_variable2);
+
+                                                                    foreach (string str in lst_string_wl)
+                                                                    {
+                                                                        str.Replace("https://evicrm.store/uploads/tasktracking/", "");
+                                                                    }
+
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bx-error-circle h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="col-lg-4">
+                                                                                <div class="card bg-info text-white-50">
+                                                                                    <div class="card-body">
+                                                                                        <h5 class="mb-4 text-white"><i class="bx bxs-face me-3"></i>Добавлены новые файлы</h5>
+                                                                                        <h5 class="card-text text-black-50">@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</h5>
+                                                                                        <h5 class="card-text text-black-50">@((MarkupString)elem.task_variable1)</h5>
+
+                                                                                        @for (int o = 0; o < lst_string.Count; o++)
+                                                                                        {
+                                                                                            <div class="flex-shrink-0 me-3">
+                                                                                                <i class="bx bx-file h5 text-primary dont-break-out"><a href="@lst_string[o]">@lst_string_wl[o]</a> </i>
+                                                                                            </div>
+                                                                                        }
+
+                                                                                        <div class="avatar-group">
+                                                                                            @{
+                                                                                                cast = bc.getMultipleStringDecodingString(elem.task_variable3);
+                                                                                                users_avatars_lst = new List<string>();
+
+                                                                                                foreach (string elem2 in cast)
+                                                                                                {
+                                                                                                    users_avatars_lst.Add(getUserByUserID(elem2).avatar);
+                                                                                                }
+
+                                                                                                for (int av = 0; av < cast.Count; av++)
+                                                                                                {
+                                                                                                    if (users_avatars_lst[av] == "" || users_avatars_lst[av] == null)
+                                                                                                    {
+                                                                                                        string str = cast[av].ToUpper();
+                                                                                                        char b_str = '?';
+
+                                                                                                        if (str.Length > 0)
+                                                                                                        {
+                                                                                                            b_str = str[0];
+                                                                                                        }
+
+                                                                                                        <div class="avatar-group-item">
+                                                                                                            <a href="javascript: void(0);" class="d-inline-block">
+                                                                                                                <div class="avatar-xs">
+                                                                                                                    <span class="avatar-title rounded-circle bg-danger text-white font-size-16">
+
+                                                                                                                        @b_str
+
+                                                                                                                    </span>
+                                                                                                                </div>
+                                                                                                            </a>
+                                                                                                        </div>
+                                                                                                    }
+                                                                                                    else
+                                                                                                    {
+                                                                                                        if (File.Exists(Path.Combine(_env.WebRootPath, "uploads", "users", "avatars", users_avatars_lst[av])))
+                                                                                                        {
+                                                                                                            <div class="avatar-group-item">
+                                                                                                                <a href="javascript: void(0);" class="d-inline-block">
+                                                                                                                    <div class="avatar-xs">
+                                                                                                                        <img src="/uploads/users/avatars/@users_avatars_lst[av]" alt="" class="avatar-xs" />
+                                                                                                                    </div>
+                                                                                                                </a>
+                                                                                                            </div>
+                                                                                                        }
+                                                                                                        else
+                                                                                                        {
+                                                                                                            <div class="avatar-group-item">
+                                                                                                                <a href="javascript: void(0);" class="d-inline-block">
+                                                                                                                    <div class="avatar-xs">
+                                                                                                                        <img src="/uploads/users/avatars/default.png" alt="" class="avatar-xs" />
+                                                                                                                    </div>
+                                                                                                                </a>
+                                                                                                            </div>
+                                                                                                        }
+                                                                                                    }
+                                                                                                }
+
+                                                                                            }
+
+                                                                                        </div>
+
+
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+                                                                    break;
+                                                                case "REFUSE":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bxs-no-entry h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="flex-grow-1">
+                                                                                <div>
+                                                                                    <h5>Пользователь отказался выполнять задачу</h5>
+                                                                                    @{
+                                                                                        switch (elem.task_variable1)
+                                                                                        {
+                                                                                            case "NOTME":
+                                                                                                <h5>Так как она не связана с ним</h5>
+                                                                                                break;
+
+                                                                                            case "IMPOSSIBLE":
+                                                                                                <h5>Считает задачу невозможной</h5>
+                                                                                                break;
+
+                                                                                            case "NOWAY":
+                                                                                                <h5>Не согласен с условиями</h5>
+                                                                                                break;
+
+                                                                                        }
+                                                                                    }
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+                                                                    break;
+                                                                case "ROGER":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bx-message h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="flex-grow-1">
+                                                                                <div>
+                                                                                    <h5>Пользователь подтвердил условия выполнения задачи</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <h5 class="card-text text-black-50">@((MarkupString)elem.task_variable1)</h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+                                                                    break;
+                                                                case "CHANGEDEADLINE":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bx-calendar-event h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="flex-grow-1">
+                                                                                <div>
+                                                                                    <h5>Перенёс дедлайн по задаче</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <h5 class="card-text text-black-50">@((MarkupString)elem.task_variable1)</h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+                                                                    break;
+                                                                case "CHANGESTARTDATE":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bx-calendar-event h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="flex-grow-1">
+                                                                                <div>
+                                                                                    <h5>Перенёс дату начала выполнения задачи</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <h5 class="card-text text-black-50">@((MarkupString)elem.task_variable1)</h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+                                                                    break;
+                                                                
+                                                                    case "ADDGOALS":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bxs-bookmarks h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="flex-grow-1">
+                                                                                <div>
+                                                                                    <h5>Добавил цель</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <h5 class="card-text text-black-50">@((MarkupString)elem.task_variable1)</h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+                                                                    break;
+                                                              
+
+                                                                case "PERSONALCOMPLETE":
+                                                                    <li class="event-list">
+                                                                        <ul>
+                                                                            <li class="event-list">
+                                                                                <div class="event-timeline-dot">
+                                                                                    <i class="bx bx-right-arrow-circle"></i>
+                                                                                </div>
+                                                                                <div class="d-flex">
+                                                                                    <div class="flex-shrink-0 me-3">
+                                                                                        <i class="bx bx-git-merge h2 text-primary"></i>
+                                                                                    </div>
+                                                                                    <div class="flex-grow-1">
+                                                                                        <div>
+                                                                                            <h5>Выполнил делегированную задачу</h5>
+                                                                                            <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                            <h5 class="card-text text-black-50">Ранее @elem.task_variable1 делегировал для @elem.task_variable2</h5>
+                                                                                            <h5 class="card-text text-black-50">Цель c названием : @elem.task_variable3</h5>
+                                                                                            <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </li>
+                                                                        </ul>
+                                                                    </li>
+                                                                    break;
+                                                                case "PERSONALDELAY":
+                                                                    <li class="event-list">
+                                                                        <ul>
+                                                                            <li class="event-list">
+                                                                                <div class="event-timeline-dot">
+                                                                                    <i class="bx bx-right-arrow-circle"></i>
+                                                                                </div>
+                                                                                <div class="d-flex">
+                                                                                    <div class="flex-shrink-0 me-3">
+                                                                                        <i class="bx bx-error h2 text-primary"></i>
+                                                                                    </div>
+                                                                                    <div class="flex-grow-1">
+                                                                                        <div>
+                                                                                            <h5>Отложил по срокам выполнение делегированной задачи</h5>
+                                                                                            <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                            <h5 class="card-text text-black-50">Ранее @elem.task_variable1 делегировал для @elem.task_variable2</h5>
+                                                                                            <h5 class="card-text text-black-50">Цель c названием : @elem.task_variable3</h5>
+                                                                                            <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </li>
+                                                                        </ul>
+                                                                    </li>
+                                                                    break;
+                                                                case "PERSONALREFUSE":
+                                                                    <li class="event-list">
+                                                                        <ul>
+                                                                            <li class="event-list">
+                                                                                <div class="event-timeline-dot">
+                                                                                    <i class="bx bx-right-arrow-circle"></i>
+                                                                                </div>
+                                                                                <div class="d-flex">
+                                                                                    <div class="flex-shrink-0 me-3">
+                                                                                        <i class="bx bx-minus-circle h2 text-primary"></i>
+                                                                                    </div>
+                                                                                    <div class="flex-grow-1">
+                                                                                        <div>
+                                                                                            <h5>Отказался от выполнения делегированной задачи</h5>
+                                                                                            <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                            <h5 class="card-text text-black-50">Ранее @elem.task_variable1 делегировал для @elem.task_variable2</h5>
+                                                                                            <h5 class="card-text text-black-50">Цель c названием : @elem.task_variable3</h5>
+                                                                                            <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </li>
+                                                                        </ul>
+                                                                    </li>
+                                                                    break;
+                                                                case "PERSONALUNDELEGATE":
+                                                                    <li class="event-list">
+                                                                        <ul>
+                                                                            <li class="event-list">
+                                                                                <div class="event-timeline-dot">
+                                                                                    <i class="bx bx-right-arrow-circle"></i>
+                                                                                </div>
+                                                                                <div class="d-flex">
+                                                                                    <div class="flex-shrink-0 me-3">
+                                                                                        <i class="bx bx-x h2 text-primary"></i>
+                                                                                    </div>
+                                                                                    <div class="flex-grow-1">
+                                                                                        <div>
+                                                                                            <h5>Пользователь вернул выполнение задания команде</h5>
+                                                                                            <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                            <h5 class="card-text text-black-50">Ранее @elem.task_variable1 делегировал для @elem.task_variable2</h5>
+                                                                                            <h5 class="card-text text-black-50">Цель с названием @elem.task_variable3</h5>
+                                                                                            <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </li>
+                                                                        </ul>
+                                                                    </li>
+                                                                    break;
+
+                                                                case "QUESTION":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bx-error-circle h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="col-lg-4">
+                                                                                <div class="card bg-info">
+                                                                                    <div class="card-body">
+                                                                                        <h5 class="mb-4 text-white"><i class="bx bx-question-mark me-3"></i>Вопрос к исполнителям:</h5>
+                                                                                        <h5 class="card-text text-black-50">@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</h5>
+                                                                                        <p class="card-text text-white">@elem.task_variable1</p>
+                                                                                        <p class="card-text text-white">@((MarkupString)@elem.task_variable2)</p>
+                                                                                        <div class="avatar-group">
+                                                                                            @{
+
+                                                                                                cast = bc.getMultipleStringDecodingString(elem.task_variable3);
+                                                                                                users_avatars_lst = new List<string>();
+
+                                                                                                foreach (string elem2 in cast)
+                                                                                                {
+                                                                                                    users_avatars_lst.Add(getUserByUserID(elem2).avatar);
+                                                                                                }
+
+                                                                                                for (int av = 0; av < cast.Count; av++)
+                                                                                                {
+                                                                                                    if (users_avatars_lst[av] == "" || users_avatars_lst[av] == null)
+                                                                                                    {
+                                                                                                        string str = cast[av].ToUpper();
+                                                                                                        char b_str = '?';
+
+                                                                                                        if (str.Length > 0)
+                                                                                                        {
+                                                                                                            b_str = str[0];
+                                                                                                        }
+
+                                                                                                        <div class="avatar-group-item">
+                                                                                                            <a href="javascript: void(0);" class="d-inline-block">
+                                                                                                                <div class="avatar-xs">
+                                                                                                                    <span class="avatar-title rounded-circle bg-danger text-white font-size-16">
+
+                                                                                                                        @b_str
+
+                                                                                                                    </span>
+                                                                                                                </div>
+                                                                                                            </a>
+                                                                                                        </div>
+                                                                                                    }
+                                                                                                    else
+                                                                                                    {
+                                                                                                        if (File.Exists(Path.Combine(_env.WebRootPath, "uploads", "users", "avatars", users_avatars_lst[av])))
+                                                                                                        {
+                                                                                                            <div class="avatar-group-item">
+                                                                                                                <a href="javascript: void(0);" class="d-inline-block">
+                                                                                                                    <div class="avatar-xs">
+                                                                                                                        <img src="/uploads/users/avatars/@users_avatars_lst[av]" alt="" class="avatar-xs" />
+                                                                                                                    </div>
+                                                                                                                </a>
+                                                                                                            </div>
+                                                                                                        }
+                                                                                                        else
+                                                                                                        {
+                                                                                                            <div class="avatar-group-item">
+                                                                                                                <a href="javascript: void(0);" class="d-inline-block">
+                                                                                                                    <div class="avatar-xs">
+                                                                                                                        <img src="/uploads/users/avatars/default.png" alt="" class="avatar-xs" />
+                                                                                                                    </div>
+                                                                                                                </a>
+                                                                                                            </div>
+                                                                                                        }
+                                                                                                    }
+                                                                                                }
+
+                                                                                            }
+
+                                                                                        </div>
+
+
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+                                                                    break;
+
+                                                                case "MESSAGE":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bx-error-circle h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="col-lg-4">
+                                                                                <div class="card bg-info">
+                                                                                    <div class="card-body">
+                                                                                        <h5 class="mb-4 text-white"><i class="bx bx-error me-3"></i>Сообщение исполнителям</h5>
+                                                                                        <h5 class="card-text text-black-50">@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</h5>
+                                                                                        <p class="card-text text-white">@((MarkupString)elem.task_variable1)</p>
+                                                                                        <div class="avatar-group">
+
+                                                                                            @{
+
+                                                                                                cast = bc.getMultipleStringDecodingString(elem.task_variable3);
+                                                                                                users_avatars_lst = new List<string>();
+
+                                                                                                foreach (string elem2 in cast)
+                                                                                                {
+                                                                                                    users_avatars_lst.Add(getUserByUserID(elem2).avatar);
+                                                                                                }
+
+                                                                                                for (int av = 0; av < cast.Count; av++)
+                                                                                                {
+                                                                                                    if (users_avatars_lst[av] == "" || users_avatars_lst[av] == null)
+                                                                                                    {
+                                                                                                        string str = cast[av].ToUpper();
+                                                                                                        char b_str = '?';
+
+                                                                                                        if (str.Length > 0)
+                                                                                                        {
+                                                                                                            b_str = str[0];
+                                                                                                        }
+
+                                                                                                        <div class="avatar-group-item">
+                                                                                                            <a href="javascript: void(0);" class="d-inline-block">
+                                                                                                                <div class="avatar-xs">
+                                                                                                                    <span class="avatar-title rounded-circle bg-danger text-white font-size-16">
+
+                                                                                                                        @b_str
+
+                                                                                                                    </span>
+                                                                                                                </div>
+                                                                                                            </a>
+                                                                                                        </div>
+                                                                                                    }
+                                                                                                    else
+                                                                                                    {
+                                                                                                        if (File.Exists(Path.Combine(_env.WebRootPath, "uploads", "users", "avatars", users_avatars_lst[av])))
+                                                                                                        {
+                                                                                                            <div class="avatar-group-item">
+                                                                                                                <a href="javascript: void(0);" class="d-inline-block">
+                                                                                                                    <div class="avatar-xs">
+                                                                                                                        <img src="/uploads/users/avatars/@users_avatars_lst[av]" alt="" class="avatar-xs" />
+                                                                                                                    </div>
+                                                                                                                </a>
+                                                                                                            </div>
+                                                                                                        }
+                                                                                                        else
+                                                                                                        {
+                                                                                                            <div class="avatar-group-item">
+                                                                                                                <a href="javascript: void(0);" class="d-inline-block">
+                                                                                                                    <div class="avatar-xs">
+                                                                                                                        <img src="/uploads/users/avatars/default.png" alt="" class="avatar-xs" />
+                                                                                                                    </div>
+                                                                                                                </a>
+                                                                                                            </div>
+                                                                                                        }
+                                                                                                    }
+                                                                                                }
+
+                                                                                            }
+
+                                                                                        </div>
+
+
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+
+                                                                    break;
+
+                                                                case "WARNING":
+
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bx-error-circle h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="col-lg-4">
+                                                                                <div class="card bg-warning">
+                                                                                    <div class="card-body">
+                                                                                        <h5 class="mb-4 text-white"><i class="bx bx-error me-3"></i>Предупреждение!</h5>
+                                                                                        <h5 class="card-text text-black-50">@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</h5>
+                                                                                        <p class="card-text text-white">@elem.task_variable1</p>
+                                                                                        <p class="card-text text-white">@((MarkupString)@elem.task_variable2)</p>
+                                                                                        <div class="avatar-group">
+
+                                                                                            @{
+                                                                                                cast = bc.getMultipleStringDecodingString(elem.task_variable3);
+                                                                                                users_avatars_lst = new List<string>();
+
+                                                                                                foreach (string elem2 in cast)
+                                                                                                {
+                                                                                                    users_avatars_lst.Add(getUserByUserID(elem2).avatar);
+                                                                                                }
+
+                                                                                                for (int av = 0; av < cast.Count; av++)
+                                                                                                {
+                                                                                                    if (users_avatars_lst[av] == "" || users_avatars_lst[av] == null)
+                                                                                                    {
+                                                                                                        string str = cast[av].ToUpper();
+                                                                                                        char b_str = '?';
+
+                                                                                                        if (str.Length > 0)
+                                                                                                        {
+                                                                                                            b_str = str[0];
+                                                                                                        }
+
+                                                                                                        <div class="avatar-group-item">
+                                                                                                            <a href="javascript: void(0);" class="d-inline-block">
+                                                                                                                <div class="avatar-xs">
+                                                                                                                    <span class="avatar-title rounded-circle bg-danger text-white font-size-16">
+
+                                                                                                                        @b_str
+
+                                                                                                                    </span>
+                                                                                                                </div>
+                                                                                                            </a>
+                                                                                                        </div>
+                                                                                                    }
+                                                                                                    else
+                                                                                                    {
+                                                                                                        if (File.Exists(Path.Combine(_env.WebRootPath, "uploads", "users", "avatars", users_avatars_lst[av])))
+                                                                                                        {
+                                                                                                            <div class="avatar-group-item">
+                                                                                                                <a href="javascript: void(0);" class="d-inline-block">
+                                                                                                                    <div class="avatar-xs">
+                                                                                                                        <img src="/uploads/users/avatars/@users_avatars_lst[av]" alt="" class="avatar-xs" />
+                                                                                                                    </div>
+                                                                                                                </a>
+                                                                                                            </div>
+                                                                                                        }
+                                                                                                        else
+                                                                                                        {
+                                                                                                            <div class="avatar-group-item">
+                                                                                                                <a href="javascript: void(0);" class="d-inline-block">
+                                                                                                                    <div class="avatar-xs">
+                                                                                                                        <img src="/uploads/users/avatars/default.png" alt="" class="avatar-xs" />
+                                                                                                                    </div>
+                                                                                                                </a>
+                                                                                                            </div>
+                                                                                                        }
+                                                                                                    }
+                                                                                                }
+
+                                                                                            }
+
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+                                                                    break;
+                                                                case "REVISION":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bxs-trash h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="flex-grow-1">
+                                                                                <div>
+                                                                                    <h5>Отправил задачу на повторное выполнение (исправление)</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <h5 class="card-text text-black-50">@((MarkupString)elem.task_variable1)</h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+                                                                    break;
+
+                                                                case "CONCLUSION":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bxs-copy h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="flex-grow-1">
+                                                                                <div>
+                                                                                    <h5>Вынесли заключение по задаче</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <h5 class="card-text text-black-50">@((MarkupString)elem.task_variable1)</h5>
+                                                                                    <h5 class="card-text text-black-50">@((MarkupString)elem.task_variable2)</h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+                                                                    break;
+                                                                default:
+
+                                                                    break;
+                                                            }
+                                                        }
+                                                }
+
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            @if (!task_tracking_carousel_loaded)
+                            {
+                                <h6><i class="bx bx-buoy bx-spin text-primary display-3"></i> Лента загружается </h6>
+                            }
+
+                        </div>
+
+                        <!-- Окно действий -->
+
+                           
+                        <EviCRM.Server.Pages.Tasks.TaskTracking.TaskTracking_DownActionBar 
+                            OnCarouselRefresh=@UpdateTaskTrackingCarousel
+                            @ref=ttd
+                            personal_status=@personal_status
+                            personal_status_arg1=@personal_status_arg1
+                            personal_status_arg2=@personal_status_arg2
+                            global_personal_status=@global_personal_status
+
+                            Current_Task=@Current_Task
+                            Current_User=@user_model
+                            Divisions=@Divisions
+                   
+                            Users=@Users
+
+                            isAdmin=@isAdmin
+                            OnPersonalStatusChange=PersonalStatusChange />
+                    }
+                }
+            }
+            }
+    </Authorized>
+    <NotAuthorized>
+        <AuthorizationPrompt Title="Вам необходимо зарегистрироваться или войти! " />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code{
+
+    #region Toasts
+    //Toast Notifications
+    private string _toastText = $@"<strong>Toast:</strong> This is a(n) {NotificationTypes.Primary} notification";
+    private bool _toastShowIcon = true;
+    private bool _toastShowCloseButton = true;
+    private bool _toastShowCountdownProgress = true;
+    private uint _toastAutoCloseInSec = 5;
+    private uint _toastShadowEffect = 5;
+    private NotificationStyles _toastStyle;
+    private NotificationTypes _toastTypeLevel;
+
+    #endregion
+
+    #region ALive
+
+    private HubConnection hubConnection;
+
+
+    private void CallLoadData()   
+    { 
+        string connection_string = "server = 82.146.44.138;user = mysql_c;password = 512Dcfbd28#;database=evicrm";
+
+        var contextOptions = new DbContextOptionsBuilder<Context>()
+    .UseMySql(connection_string, ServerVersion.AutoDetect(connection_string))
+    .Options;
+
+        using (var dbContext = new Context(contextOptions))
+        {
+            Markdown_Cards = dbContext.MarkdownCard_Get();
+            Markdown_Desks = dbContext.MarkdownDesk_Get();
+            Markdown_Todos = dbContext.MarkdownTodo_Get();
+            Users = dbContext.Users_Get();
+            Divisions = dbContext.Divisions_Get();
+            TaskTrackingCards = dbContext.TaskTrackingCard_Get();
+            TaskTrackingMain = dbContext.TaskTrackingMain_Get();
+    }
+        Task.Run(async () =>  
+        {  
+            await LoadData();  
+        });  
+    }  
+
+    protected async Task LoadData()
+    {
+        await ToastsNotifications_ShowCustomToast_Info("Загрузила новые сведения в задачнике!");
+    }  
+
+    public bool IsConnected =>  
+        hubConnection.State == HubConnectionState.Connected;  
+  
+   
+    #endregion
+}
+
+
+@code {
+
+   
+
+
+    public void ContextHandler_CreateMarkdownDesk(schema_markdown_desks schmd)
+    {
+        _context.MarkdownDesk_Create(schmd);
+        StateHasChanged();
+    }
+
+    public void ContextHandler_CreateMarkdownCard(MarkdownCard_TwoWayDesksBindings twdb)
+    {
+        _context.MarkdownCard_Create(twdb.Card);
+
+        var lat_created = _context.MarkdownCardSingle_Get(twdb.Card);
+
+        if (twdb.Todos != null)
+        {
+            if (twdb.Todos.Count > 0)
+            {
+                if (lat_created != null)
+                {
+                    int card_id = lat_created.idmarkdown_cards;
+
+                    for(int i = 0; i<twdb.Todos.Count;i++)
+                    {
+                        twdb.Todos[i].markdown_todo_cardid = card_id;
+                    }
+
+                    _context.Markdowntodos_Create(twdb.Todos);
+                }
+            }
+        }
+
+        StateHasChanged();
+    }
+
+}

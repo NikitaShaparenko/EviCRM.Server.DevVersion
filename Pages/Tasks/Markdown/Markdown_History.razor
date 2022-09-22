@@ -1,0 +1,396 @@
+﻿@inject Context _context;
+
+<div class="modal fade show" id="myModal" style="display:block; background-color: rgba(10,10,10,.8);" aria-modal="true" role="dialog">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">История карточки @Card.markdown_card_name</h4>
+                <button type="button" class="close" @onclick="@ModalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+               @if (ready)
+                {
+              
+                @if (history != null)
+                {
+                    if (history.Count > 0)
+                    {
+                        <div class="row">
+                            <div class="col-lg-12">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h4 class="card-title mb-5">Хронология событий</h4>
+                                        <div class="">
+                                            <ul class="verti-timeline list-unstyled">
+
+                                                @foreach(var elem in history)
+                                                    {
+                                                        @switch(elem.task_cmd)
+                                                        {
+                                                            //Goals
+
+                                                             case "ADDGOALS":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bxs-bookmarks h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="flex-grow-1">
+                                                                                <div>
+                                                                                    <h5>Добавил новое дело</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <h5 class="card-text text-black-50">@((MarkupString)elem.task_variable1)</h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+                                                                    break;
+                                                              case "DELETEGOALS":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bxs-bookmarks h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="flex-grow-1">
+                                                                                <div>
+                                                                                    <h5>Удалил одно из дел</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <h5 class="card-text text-black-50">@((MarkupString)elem.task_variable1)</h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+                                                                    break;
+                                                                case "MARKGOALS":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bxs-bookmarks h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="flex-grow-1">
+                                                                                <div>
+                                                                                    <h5>Отметил дело выполненым</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <h5 class="card-text text-black-50">@((MarkupString)elem.task_variable1)</h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+                                                                    break;
+
+                                                                     case "UNMARKGOALS":
+                                                                    <li class="event-list">
+                                                                        <div class="event-timeline-dot">
+                                                                            <i class="bx bx-right-arrow-circle"></i>
+                                                                        </div>
+                                                                        <div class="d-flex">
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <i class="bx bxs-bookmarks h2 text-primary"></i>
+                                                                            </div>
+                                                                            <div class="flex-grow-1">
+                                                                                <div>
+                                                                                    <h5>Отметил дело НЕ выполненым</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <h5 class="card-text text-black-50">@((MarkupString)elem.task_variable1)</h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </li>
+                                                                    break;
+
+                                                                      case "DELEGATEDESK":
+                                                                    <li class="event-list">
+                                                                        <ul>
+                                                                            <li class="event-list">
+                                                                                <div class="event-timeline-dot">
+                                                                                    <i class="bx bx-right-arrow-circle"></i>
+                                                                                </div>
+                                                                                <div class="d-flex">
+                                                                                    <div class="flex-shrink-0 me-3">
+                                                                                        <i class="bx bx-git-pull-request h2 text-primary"></i>
+                                                                                    </div>
+                                                                                    <div class="flex-grow-1">
+                                                                                        <div>
+                                                                                            <h5>Делегировал доску</h5>
+                                                                                            <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                            <h5 class="card-text text-black-50">Делегировал @elem.task_variable1 для @elem.task_variable2</h5>
+                                                                                            <h5 class="card-text text-black-50">Доска c названием : @elem.task_variable3</h5>
+                                                                                            <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </li>
+                                                                        </ul>
+                                                                    </li>
+                                                                    break;
+
+                                                                case "DELEGATECARD":
+                                                                    <li class="event-list">
+                                                                        <ul>
+                                                                            <li class="event-list">
+                                                                                <div class="event-timeline-dot">
+                                                                                    <i class="bx bx-right-arrow-circle"></i>
+                                                                                </div>
+                                                                                <div class="d-flex">
+                                                                                    <div class="flex-shrink-0 me-3">
+                                                                                        <i class="bx bx-git-pull-request h2 text-primary"></i>
+                                                                                    </div>
+                                                                                    <div class="flex-grow-1">
+                                                                                        <div>
+                                                                                            <h5>Делегировал карточку</h5>
+                                                                                            <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                            <h5 class="card-text text-black-50">Делегировал @elem.task_variable1 для @elem.task_variable2</h5>
+                                                                                            <h5 class="card-text text-black-50">Карточка c названием : @elem.task_variable3</h5>
+                                                                                            <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </li>
+                                                                        </ul>
+                                                                    </li>
+                                                                    break;
+
+                                                                     case "ADDDESK":
+                                                                    <li class="event-list">
+                                                                        <ul>
+                                                                            <li class="event-list">
+                                                                                <div class="event-timeline-dot">
+                                                                                    <i class="bx bx-right-arrow-circle"></i>
+                                                                                </div>
+                                                                                <div class="d-flex">
+                                                                                    <div class="flex-shrink-0 me-3">
+                                                                                        <i class="bx bx-git-pull-request h2 text-primary"></i>
+                                                                                    </div>
+                                                                                    <div class="flex-grow-1">
+                                                                                        <div>
+                                                                                           <h5>Создал новую доску</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <h5 class="card-text text-black-50">@((MarkupString)elem.task_variable1)</h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </li>
+                                                                        </ul>
+                                                                    </li>
+                                                                    break;
+
+                                                                     case "ADDCARD":
+                                                                    <li class="event-list">
+                                                                        <ul>
+                                                                            <li class="event-list">
+                                                                                <div class="event-timeline-dot">
+                                                                                    <i class="bx bx-right-arrow-circle"></i>
+                                                                                </div>
+                                                                                <div class="d-flex">
+                                                                                    <div class="flex-shrink-0 me-3">
+                                                                                        <i class="bx bx-git-pull-request h2 text-primary"></i>
+                                                                                    </div>
+                                                                                    <div class="flex-grow-1">
+                                                                                        <div>
+                                                                                            <h5>Создал новую карточку</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <h5 class="card-text text-black-50">@((MarkupString)elem.task_variable1)</h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </li>
+                                                                        </ul>
+                                                                    </li>
+                                                                    break;
+
+                                                                     case "EDITDESK":
+                                                                    <li class="event-list">
+                                                                        <ul>
+                                                                            <li class="event-list">
+                                                                                <div class="event-timeline-dot">
+                                                                                    <i class="bx bx-right-arrow-circle"></i>
+                                                                                </div>
+                                                                                <div class="d-flex">
+                                                                                    <div class="flex-shrink-0 me-3">
+                                                                                        <i class="bx bx-git-pull-request h2 text-primary"></i>
+                                                                                    </div>
+                                                                                    <div class="flex-grow-1">
+                                                                                        <div>
+                                                                                           <h5>Редактировал доску</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <h5 class="card-text text-black-50">@((MarkupString)elem.task_variable1)</h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </li>
+                                                                        </ul>
+                                                                    </li>
+                                                                    break;
+
+                                                                     case "EDITCARD":
+                                                                    <li class="event-list">
+                                                                        <ul>
+                                                                            <li class="event-list">
+                                                                                <div class="event-timeline-dot">
+                                                                                    <i class="bx bx-right-arrow-circle"></i>
+                                                                                </div>
+                                                                                <div class="d-flex">
+                                                                                    <div class="flex-shrink-0 me-3">
+                                                                                        <i class="bx bx-git-pull-request h2 text-primary"></i>
+                                                                                    </div>
+                                                                                    <div class="flex-grow-1">
+                                                                                        <div>
+                                                                                            <h5>Редактировал карточку</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <h5 class="card-text text-black-50">@((MarkupString)elem.task_variable1)</h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </li>
+                                                                        </ul>
+                                                                    </li>
+                                                                    break;
+
+                                                                     case "REMOVEDESK":
+                                                                    <li class="event-list">
+                                                                        <ul>
+                                                                            <li class="event-list">
+                                                                                <div class="event-timeline-dot">
+                                                                                    <i class="bx bx-right-arrow-circle"></i>
+                                                                                </div>
+                                                                                <div class="d-flex">
+                                                                                    <div class="flex-shrink-0 me-3">
+                                                                                        <i class="bx bx-git-pull-request h2 text-primary"></i>
+                                                                                    </div>
+                                                                                    <div class="flex-grow-1">
+                                                                                        <div>
+                                                                                           <h5>Удалил доску</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <h5 class="card-text text-black-50">@((MarkupString)elem.task_variable1)</h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </li>
+                                                                        </ul>
+                                                                    </li>
+                                                                    break;
+
+                                                                     case "REMOVECARD":
+                                                                    <li class="event-list">
+                                                                        <ul>
+                                                                            <li class="event-list">
+                                                                                <div class="event-timeline-dot">
+                                                                                    <i class="bx bx-right-arrow-circle"></i>
+                                                                                </div>
+                                                                                <div class="d-flex">
+                                                                                    <div class="flex-shrink-0 me-3">
+                                                                                        <i class="bx bx-git-pull-request h2 text-primary"></i>
+                                                                                    </div>
+                                                                                    <div class="flex-grow-1">
+                                                                                        <div>
+                                                                                            <h5>Удалил карточку</h5>
+                                                                                    <h5><i>@elem.task_datetime.ToShortDateString() , @elem.task_datetime.ToShortTimeString()</i></h5>
+                                                                                    <h5 class="card-text text-black-50">@((MarkupString)elem.task_variable1)</h5>
+                                                                                    <p class="text-muted">@getFullnameUserByLogin(elem.task_author)</p>
+
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </li>
+                                                                        </ul>
+                                                                    </li>
+                                                                    break;
+
+
+
+                                                                   
+                                                        }
+                                                    }
+
+                                                
+
+                                                 </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            </div>
+                    }
+                }
+                else
+                {
+                    <h5>История по карточке не найдена!</h5>
+                    }
+
+                }
+                else
+                {
+                     <h5><i class="bx bx-buoy bx-spin text-primary display-3"></i> Загружаю историю, ожидайте пожалуйста... </h5>
+                }
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" @onclick=@ModalClose>Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code{
+    bool ready = false;
+
+    public List<schema_task_tracking_main> history = new();
+
+    [Parameter]
+    public schema_markdown_cards Card { get; set; }
+
+    [Parameter]
+    public List<schema_users> Users { get; set; }
+}
+
+@code{
+    [Parameter]
+    public EventCallback<bool> OnClose { get; set; }
+}
+@code{
+    public void ModalClose()
+    {
+        OnClose.InvokeAsync();
+    }
+
+    protected override void OnInitialized()
+    {
+        history = _context.task_tracking_main.Where(p => p.task_card == Card.idmarkdown_cards.ToString()).ToList();
+        ready = true;
+        StateHasChanged();
+    }
+
+      public string getFullnameUserByLogin(string login)
+        {
+            return Users.FirstOrDefault(p => p.login.Equals(login)).fullname;
+        }
+}

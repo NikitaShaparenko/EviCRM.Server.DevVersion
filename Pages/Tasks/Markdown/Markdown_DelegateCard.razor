@@ -1,0 +1,187 @@
+﻿@using System.ComponentModel.DataAnnotations
+@using EviCRM.Server.Pages.Secretary
+<!doctype html>
+
+<PageTitle>Markdown - Делегирование карточки</PageTitle>
+
+<html>
+<head>
+    <meta charset="utf-8">
+
+</head>
+
+<style>
+
+      .action_menu2 {
+        position: absolute;
+        right: 5px;
+        bottom: 5px;
+    }
+
+     .action_menu {
+        position: absolute;
+        right: 65px;
+        bottom: 5px;
+    }
+
+    .btn-circle {
+        width: 50px;
+        height: 50px;
+        border-radius: 35px;
+        text-align: center;
+        padding-left: 0;
+        padding-right: 0;
+        font-size: 16px;
+        white-space: normal; /* восстанавливаем свойству значение по умолчанию */
+    }
+</style>
+
+<body>
+    @if (ready)
+    {
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title mb-4">Делегировать карточку</h3>
+
+                    <h5>Выбрана карта для делегирования: @Card.markdown_card_name</h5>
+
+                         <div class="form-group row mb-4">
+                           
+                            <div class="col-lg-10">
+                                <label class="col-form-label">На доску:</label>
+                            </div>
+
+                            <div class="col-lg-10">
+                                <Havit.Blazor.Components.Web.Bootstrap.HxSelect 
+                                Label="Список досок и принадлежность"
+                                                                            TItem="@SelectData"
+                                                                            TValue="string"
+                                                                            Data="@select_data_desks"
+                                                                            @bind-Value="@SelectedValues_desks"
+                                                                            TextSelector="@((p) => p.Name)"
+                                                                            ValueSelector="@((p) => p.Id)"
+                                                                            NullDataText="Загружаются значения..." />
+                            </div>
+                        </div>
+
+                     <div class="action_menu">
+                        <button type="button" @onclick="SaveCard" class="btn btn-success btn-circle"><i class="mdi mdi-check"></i></button>
+                    </div>
+                     <div class="action_menu2">
+                        <button type="button" @onclick="ExitCard" class="btn btn-danger btn-circle"><i class="mdi mdi-close"></i></button>
+                    </div>
+
+
+                </div>
+            </div>
+        </div>
+    </div>
+    }
+</body>
+</html>
+
+@code{
+    [Parameter]
+    public int desk_num_id { get; set;}
+
+    [Parameter]
+    public string card_name { get; set; }
+
+    [Parameter]
+    public EventCallback<string> ErrorShow {get;set;}
+
+    [Parameter]
+    public List<schema_users> Users { get; set; }
+
+    [Parameter]
+    public List<schema_markdown_desks> Desks { get; set; }
+
+    [Parameter]
+    public schema_markdown_cards Card { get; set; }
+
+    [Parameter]
+    public schema_users Current_User { get; set; }
+
+    IList<SelectData> select_data_desks = new List<SelectData>();
+
+    bool ready = false;
+    string SelectedValues_desks;
+}
+
+@code{
+    protected override void OnInitialized()
+    {
+        ready = false;
+
+        if (Users != null && Desks != null)
+        {
+            if (Users.Count > 0 && Desks.Count > 0)
+            {
+                foreach (var elem in Desks)
+                {
+                    SelectData sd = new();
+                    sd.Id = elem.idmarkdown_desks.ToString();
+                    sd.Name = elem.markdown_desk_name;
+
+                    if (elem.markdown_desk_personal_id == -1 || elem.markdown_desk_personal_id == null)
+                    {
+                        //Общая
+                        sd.Name += " (Общая)";
+                    }
+                    else
+                    {
+                        var elem_u = Users.FirstOrDefault(p=>p.id == elem.markdown_desk_personal_id);
+                        if (elem_u != null)
+                        {
+                            sd.Name += " (" + elem_u.fullname + ")";
+                        }
+                    }
+                    select_data_desks.Add(sd);
+                }
+            }
+        }
+        ready = true;
+        StateHasChanged();
+    }
+
+    public void SaveCard()
+    {
+        if (SelectedValues_desks == "" || SelectedValues_desks == null)
+        {
+            ErrorShow.InvokeAsync("Надо выбрать кому делегировать карту!");
+            return;
+        }
+
+        if (int.TryParse(SelectedValues_desks,out int a))
+        {
+            Card.markdown_card_deskid = a;
+            MarkdownCard_TwoWayDesksBindings mctwdb = new();
+            mctwdb.Card = Card;
+            mctwdb.desk_num = desk_num_id;
+
+            OnSave.InvokeAsync(mctwdb);
+        }
+        else
+        {
+            return;
+        }
+
+        
+    }
+
+    public void ExitCard()
+    {
+        OnExit.InvokeAsync(desk_num_id);
+    }
+    }
+
+
+@code{
+    [Parameter]
+    public EventCallback<MarkdownCard_TwoWayDesksBindings> OnSave { get; set; }
+
+     [Parameter]
+    public EventCallback<int> OnExit { get; set; }
+}

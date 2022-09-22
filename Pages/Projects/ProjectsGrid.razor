@@ -1,0 +1,447 @@
+﻿@page "/proj_grid"
+@using EviCRM.Server.Core
+@using Majorsoft.Blazor.Extensions.BrowserStorage
+@using Microsoft.AspNetCore.Identity
+@inject IWebHostEnvironment _env
+@inject SignInManager<IdentityUser> SignInManager
+@inject AuthenticationStateProvider authStateProvider
+@inject NavigationManager UriHelper
+
+@inject ILocalStorageService _localStorageService
+
+@inject Context _context
+@inject Sentinel sentinel
+@inject SystemCore sc
+@inject BackendController bc
+
+<h5>Проекты \ Сеткой</h5>
+<PageTitle>Проекты \ Сеткой</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <div class="row">
+
+            @if (ready)
+                @if (Projects != null)
+                {
+                    if (Projects.Count == 0)
+                    {
+                        <h5 class="text-truncate font-size-14"><a href="javascript: void(0);" class="text-dark">Нет проектов в текущем представлении</a></h5>
+                    }
+                    else
+                    {
+
+                        @foreach (var elem in Projects)
+                        {
+
+                            @if (username_is_incast.Contains(elem.id.ToString()) || (username_is_inauthors.Contains(elem.id.ToString())) || isAdmin)
+                            {
+                                <div class="col-xl-4 col-sm-6">
+                                    <div class="card">
+                                        <div class="card-body">
+
+                                            <div class="d-flex">
+                                                <div class="flex-shrink-0 me-4">
+                                                    <div class="avatar-md">
+                                                        <span class="avatar-title rounded-circle bg-light text-danger font-size-16">
+                                                            @{
+
+                                                                string path_to_file = _env.WebRootPath;
+                                                                path_to_file = Path.Combine(_env.WebRootPath, "uploads", "users", "avatars");
+
+
+                                                                if (File.Exists(path_to_file + elem.proj_avatar_path))
+                                                                {
+                                                                    <img src="/uploads/users/avatars/@elem.proj_avatar_path" alt="" class="avatar-sm">
+                                                                }
+                                                                else
+                                                                {
+                                                                    <img src="/avatars_past/img-1.png" alt="" class="avatar-sm">
+                                                                }
+
+                                                            }
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+
+                                                <div class="flex-grow-1 overflow-hidden">
+
+                                                    <h5 class=text-truncate font-size><button type="button" @onclick="() => ProjectShow(elem.id.ToString())" class="btn btn-link">@elem.proj_name</button></h5>
+
+
+
+                                                    <p class="text-muted mb-4">@elem.proj_description</p>
+
+                                                    <div class="avatar-group">
+
+                                                        @{
+                                                            List<string> cast = bc.getMultipleStringDecodingString(elem.proj_users);
+                                                            List<string> users_avatars = new List<string>();
+
+                                                            foreach (string elem_cast in cast)
+                                                            {
+                                                                users_avatars.Add(getUserFromLogin(elem_cast).avatar);
+                                                            }
+
+                                                            for (int av = 0; av < cast.Count; av++)
+                                                            {
+                                                                if (users_avatars[av] == "" || users_avatars[av] == null)
+                                                                {
+                                                                    string str = cast[av].ToUpper();
+                                                                    char b_str = '?';
+
+                                                                    if (str.Length > 0)
+                                                                    {
+                                                                        b_str = str[0];
+                                                                    }
+
+                                                                    <div class="avatar-group-item">
+                                                                        <a href="javascript: void(0);" class="d-inline-block">
+                                                                            <div class="avatar-xs">
+                                                                                <span class="avatar-title rounded-circle bg-danger text-white font-size-16">
+
+                                                                                    @b_str
+
+                                                                                </span>
+                                                                            </div>
+                                                                        </a>
+                                                                    </div>
+                                                                }
+                                                                else
+                                                                {
+                                                                    if (File.Exists(Path.Combine(_env.WebRootPath, "uploads", "users", "avatars", users_avatars[av])))
+                                                                    {
+                                                                        <div class="avatar-group-item">
+                                                                            <a href="javascript: void(0);" class="d-inline-block">
+                                                                                <div class="avatar-xs">
+                                                                                    <img src="/uploads/users/avatars/@users_avatars[av]" alt="" class="avatar-xs" />
+                                                                                </div>
+                                                                            </a>
+                                                                        </div>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        <div class="avatar-group-item">
+                                                                            <a href="javascript: void(0);" class="d-inline-block">
+                                                                                <div class="avatar-xs">
+                                                                                    <img src="/uploads/users/avatars/default.png" alt="" class="avatar-xs" />
+                                                                                </div>
+                                                                            </a>
+                                                                        </div>
+                                                                    }
+                                                                }
+                                                            }
+
+                                                        }
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="px-4 py-3 border-top">
+                                            <ul class="list-inline mb-0">
+
+                                                @if (@elem.proj_status == "waiting")
+                                                {
+                                                    <li class="list-inline-item me-3">
+                                                        <span class="badge bg-dark">Ожидает подтверждения</span>
+                                                    </li>
+                                                }
+                                                @if (@elem.proj_status == "approved")
+                                                {
+                                <td><span class="badge bg-success">Подтверждён</span></td>
+                                                }
+
+                            </ul>
+
+
+                            <ul class="list-inline mb-0">
+                                <li class="list-inline-item me-3">
+                                    <i class="bx bx-calendar me-1"></i> @elem.proj_end.ToShortDateString()
+                                </li>
+                                <li class="list-inline-item me-3">
+                                    <i class="bx bx-task me-1"></i> @how_much_tasks_in_project(elem)
+                                </li>
+                                <li class="list-inline-item me-3">
+                                    <i class="bx bx-timer"></i> @getCountdown(elem.proj_end))
+                                </li>
+                            </ul>
+                            </div>
+                            </div>
+                            </div>
+                            }
+                        }
+                    }
+                }
+        </div>
+
+
+    </Authorized>
+    <NotAuthorized>
+        <AuthorizationPrompt Title="Вам необходимо зарегистрироваться или войти! " />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code
+{
+    bool ready { get; set; }
+
+    int tasks_b1 = 0;
+    int tasks_b2 = 0;
+    int tasks_b3 = 0;
+
+    string user_ { get; set; }
+    bool isAdmin = false;
+
+    List<schema_projects> Projects = new();
+    List<schema_users> Users = new();
+    List<schema_tasks> Tasks = new();
+
+                }
+
+@code
+{
+    #region Sys Var
+    private async Task<string> GetLocalStorageItems(string key)
+    {
+        return await _localStorageService.GetItemAsStringAsync(key);
+    }
+
+    private async Task InsertLocalStorageItems(string key, string val)
+    {
+        await _localStorageService.SetItemAsync(key, val);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            ready = false;
+            new Timer(DateTimeCallback, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        }
+    }
+
+    private int _localStorageCount;
+    private IList<KeyValuePair<string, string>> _localStorageItems;
+
+
+    private async Task RefreshLocalStorageItems()
+    {
+        _localStorageItems = new List<KeyValuePair<string, string>>();
+        await foreach (var key in _localStorageService.GetAllKeysAsync())
+        {
+            if (key is null)
+                continue;
+
+            _localStorageItems.Add(new KeyValuePair<string, string>(key, await _localStorageService.GetItemAsStringAsync(key)));
+        }
+
+    }
+    private async Task SaveCustomLocalStorageItem(string key, string val)
+    {
+        await _localStorageService.SetItemAsync(key, val);
+        await RefreshLocalStorageItems();
+    }
+
+
+
+    private void DateTimeCallback(object state)
+    {
+        //Thread.Sleep(10);
+        //getCountdownList();
+        //InvokeAsync(StateHasChanged);
+    }
+
+
+    #endregion
+}
+
+@functions {
+
+    public schema_users getUserFromLogin(string login)
+    {
+        return Users.FirstOrDefault(p => p.id.ToString() == login);
+    }
+
+
+    List<string> isInCast(string username)
+    {
+        List<string> lstr = new List<string>();
+        List<string> buffer_decoder = new List<string>();
+
+        if (Projects != null)
+        {
+            foreach (var elem in Projects)
+            {
+                buffer_decoder = bc.getMultipleStringDecodingString(elem.proj_users);
+                foreach (string bd in buffer_decoder)
+                {
+                    if (bd == username)
+                    {
+                        lstr.Add(elem.id.ToString());
+                    }
+                }
+            }
+        }
+
+        return lstr;
+    }
+
+    int how_much_tasks_in_project(schema_projects proj)
+    {
+        string proj_id_tasks = proj.proj_tasks;
+
+        int p = 0;
+
+        List<string> proj_tasks = new List<string>();
+        proj_tasks = bc.getMultipleStringDecodingString(proj.proj_tasks);
+        foreach (string elem in proj_tasks)
+        {
+            if (elem == proj.id.ToString())
+            {
+                p = p + 1;
+            }
+        }
+        return p;
+    }
+
+    List<string> isInAuthors(string username)
+    {
+        List<string> lstr = new List<string>();
+        List<string> buffer_decoder = new List<string>();
+
+        if (Projects != null)
+        {
+            foreach (var elem in Projects)
+            {
+                if (elem.proj_users == username)
+                {
+                    lstr.Add(elem.id.ToString());
+                }
+            }
+        }
+        return lstr;
+    }
+
+
+    string current_date_time { get; set; }
+
+
+
+    string getStringTimeDiffer(DateTime proj_end)
+    {
+        return getCountdown(proj_end);
+    }
+
+    public async Task getCountdownList()
+    {
+        if (ready)
+        {
+            proj_end_countdown_dt.Clear();
+
+
+            if (Projects != null)
+            {
+                foreach (var elem in Projects)
+                {
+                    proj_end_countdown_dt.Add(getCountdown(elem.proj_end));
+                }
+            };
+            
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public string getCountdown(DateTime dt_end)
+    {
+        DateTime current = DateTime.Now;
+        string countdown = "";
+        var diff_dt = dt_end - current;
+        if (diff_dt.TotalSeconds < 0)
+        {
+            countdown = "Просрочка на ";
+            diff_dt = diff_dt.Negate();
+        }
+        else
+        {
+            countdown = "Осталось ";
+        }
+
+        if (diff_dt.Days > 0)
+        {
+            countdown += diff_dt.Days + " дней ";
+        }
+
+        if (diff_dt.Hours > 0)
+        {
+            countdown += diff_dt.Hours + " часов ";
+        }
+
+        if (diff_dt.Minutes > 0)
+        {
+            countdown += diff_dt.Minutes + " минут ";
+        }
+
+        return countdown;
+    }
+
+
+    public async Task ProjectShow(string proj_id)
+    {
+        await SaveCustomLocalStorageItem("project_overview", proj_id);
+        UriHelper.NavigateTo("/proj_overview");
+    }
+}
+
+                @code {
+
+    List<string> proj_end_countdown_dt = new();
+
+    List<string> username_is_incast = new List<string>();
+    List<string> username_is_inauthors = new List<string>();
+
+    protected async override Task OnInitializedAsync()
+    {
+        user_ = authStateProvider.GetAuthenticationStateAsync().Result.User.Identity.Name;
+
+        var user_model = new schema_users();
+
+        if (user_ != null)
+        {
+            user_model = _context.User_Get(user_);
+
+            //Проверка админки
+            if (user_model.role == "admin" 
+                || user_model.role=="owner"
+                || user_model.role =="secretary")
+            {
+                isAdmin = true;
+            }
+            else
+            {
+                isAdmin = false;
+            }
+
+            //Загрузка данных
+
+            Projects = _context.Projects_Get();
+            Tasks = _context.Tasks_Get();
+            Users = _context.Users_Get();
+
+        }
+        else
+        {
+            //syslog
+            //notify
+            return;
+        }
+
+        username_is_incast = isInCast(user_);
+        username_is_inauthors = isInAuthors(user_);
+        ready = true;
+        StateHasChanged();
+
+
+    }
+}

@@ -1,0 +1,685 @@
+﻿
+@using Microsoft.AspNetCore.SignalR.Client
+
+@inject IWebHostEnvironment _iwebhost;
+@inject IWebHostEnvironment _env;
+@inject IToastService _toastService;
+@inject ILocalStorageService _localStorageService
+
+@inject AuthenticationStateProvider authStateProvider
+@inject NavigationManager uriHelper;
+
+@inject NavigationManager NavigationManager 
+
+@inject BackendController bc;
+@inject Context _context;
+@inject Sentinel sentinel;
+@inject SystemCore sc;
+
+@page "/news_body"
+
+<h5>Просмотр новости</h5>
+<PageTitle>Новости \ Просмотр</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+
+        @if (ready)
+        {
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="pt-3">
+                                <div class="row justify-content-center">
+                                    <div class="col-xl-8">
+                                        <div>
+                                            <div class="text-center">
+                                                <div class="mb-4">
+                                                    <a href="javascript: void(0);" class="badge bg-light font-size-12">
+                                                        <i class="bx bx-purchase-tag-alt align-middle text-muted me-1"></i> @Current_News.news_category
+                                                    </a>
+                                                </div>
+                                                <h4>@Current_News.news_head</h4>
+                                                <p class="text-muted mb-4"><i class="mdi mdi-calendar me-1"></i> @DateStringFormatted(Current_News.news_added)</p>
+                                            </div>
+
+                                            <hr>
+                                            <div class="text-center">
+                                                <div class="row">
+                                                    <div class="col-sm-4">
+                                                        <div>
+                                                            <p class="text-muted mb-2">Категория</p>
+
+                                                            @if (@Current_News.news_category == "$null")
+                                                            {
+                                                                 <h5 class="font-size-15">Категория не выбрана</h5>
+                                                            }
+                                                            else
+                                                            {
+                                                                 <h5 class="font-size-15">@Current_News.news_category</h5>
+                                                            }
+                                                           
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-sm-4">
+                                                        <div class="mt-4 mt-sm-0">
+                                                            <p class="text-muted mb-2">Дата</p>
+                                                            <h5 class="font-size-15">@DateStringFormatted(Current_News.news_added)</h5>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-sm-4">
+                                                        <div class="mt-4 mt-sm-0">
+                                                            <p class="text-muted mb-2">Опубликовал</p>
+                                                            <h5 class="font-size-15">@getUserFullnameByID(Current_News.news_author)</h5>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <hr>
+
+                                            <div class="my-5">
+                                                <img src="@Current_News.news_title_img" alt="" class="img-thumbnail mx-auto d-block">
+                                            </div>
+
+                                            <hr>
+
+                                            <div class="mt-4">
+                                                <div class="text-muted font-size-14">
+
+                                                    @((MarkupString)bc.Base64Decode(Current_News.news_body))
+
+                                                    <div class="mt-4">
+                                                        <h5 class="mb-3">Ключевые слова: </h5>
+
+                                                        <div>
+                                                            <div class="row">
+
+                                                                @{
+                                                                    List<string> news_tags_lst = bc.getMultipleStringDecodingString(Current_News.news_tags);
+                                                                }
+
+                                                                @if (news_tags_lst != null)
+                                                                    @if (news_tags_lst.Count > 0)
+                                                                    {
+
+                                                                        <div class="col-lg-4 col-sm-6">
+                                                                            <div>
+                                                                                <ul class="ps-4">
+                                                                                    @for (int i = 0; i < news_tags_lst.Count; i++)
+                                                                                    {
+                                                                                        if (i % 2 == 0)
+                                                                                        {
+                                                                                            <li class="py-1">news_tags_lst[i]</li>
+                                                                                        }
+                                                                                    }
+                                                                                </ul>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div class="col-lg-4 col-sm-6">
+                                                                            <div>
+                                                                                <ul class="ps-4">
+                                                                                    @for (int i = 0; i < news_tags_lst.Count; i++)
+                                                                                    {
+                                                                                        if (i % 2 == 1)
+                                                                                        {
+                                                                                            <li class="py-1">news_tags_lst[i]</li>
+                                                                                        }
+                                                                                    }
+                                                                                </ul>
+                                                                            </div>
+                                                                        </div>
+                                                                    }
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                </div>
+
+                                                <hr>
+
+                                                <div class="mt-5">
+
+
+                                                    @if (News_Comments != null)
+                                                        @if (News_Comments.Count > 0)
+                                                        {
+                                                            <h5 class="font-size-15"><i class="bx bx-message-dots text-muted align-middle me-1"></i> Комментарии : @News_Comments.Count</h5>
+                                                        }
+                                                        else
+                                                        {
+                                                            <h5 class="font-size-15"><i class="bx bx-message-dots text-muted align-middle me-1"></i> Комментарии к новости отсутствуют</h5>
+                                                        }
+
+                                                    @if (News_Comments != null)
+                                                        @if (News_Comments.Count > 0)
+                                                        {
+                                                            <div>
+
+                                                                @foreach (var elem in News_Comments)
+                                                                {
+                                                                    if (elem.news_inreply_id == -1) //Корневой комментарий
+                                                                    {
+                                                                        schema_users user_comment_author = getUserByID(elem.news_msg_user_id);
+                                                                        if (user_comment_author != null)
+                                                                        {
+                                                                            <div class="flex-shrink-0 me-3">
+                                                                                <div class="avatar-xs">
+                                                                                    <img src="@user_comment_author.avatar" alt="" class="img-fluid d-block rounded-circle">
+                                                                                </div>
+                                                                            </div>
+                                                                        }
+                                                                        <div class="flex-grow-1">
+                                                                            <h5 class="font-size-14 mb-1">@user_comment_author.fullname<small class="text-muted float-end">@getLatency(elem.news_msg_added)</small></h5>
+                                                                            <p class="text-muted">@elem.news_body</p>
+                                                                            <div>
+                                                                                <a href="javascript: void(0);" @onclick="()=>make_reply(elem)" class="text-success"><i class="mdi mdi-reply"></i> Ответить</a>
+                                                                            </div>
+                                                                        </div>
+
+                                                                       
+                                                                        @foreach (var sub_elem in News_Comments)
+                                                                        {
+                                                                            <div class="d-flex pt-3">
+                                                                           @if (sub_elem.news_inreply_id == elem.idnews_comments)
+                                                                            {
+                                                                                schema_users sub_users_comment_author = getUserByID(elem.news_msg_user_id);
+                                                                                if (sub_users_comment_author != null)
+                                                                                {
+                                                                                    <div class="flex-shrink-0 me-3">
+                                                                                        <div class="avatar-xs">
+                                                                                            <img src="@sub_users_comment_author.avatar" alt="" class="img-fluid d-block rounded-circle">
+                                                                                        </div>
+                                                                                    </div>
+                                                                                }
+                                                                                <div class="flex-grow-1">
+                                                                                    <h5 class="font-size-14 mb-1">@sub_users_comment_author.fullname<small class="text-muted float-end">@getLatency(sub_elem.news_msg_added)</small></h5>
+                                                                                    <p class="text-muted">@sub_elem.news_body</p>
+                                                                                    <div>
+                                                                                        <a href="javascript: void(0);" @onclick="()=>make_reply(elem)" class="text-success"><i class="mdi mdi-reply"></i> Ответить</a>
+                                                                                    </div>
+                                                                                </div>
+
+                                                                            }
+                                                                            </div>
+                                                                        }
+                                                                        
+                                                                    }
+                                                                }
+
+
+                                                            </div>
+                                                        }
+                                                </div>
+
+                                                <div class="mt-4">
+
+
+                                                    @if (isReply)
+                                                    {
+                                                        <h5 class="font-size-16 mb-3">Ответ на комментарий</h5>
+                                                    }
+                                                    else
+                                                    {
+                                                        <h5 class="font-size-16 mb-3">Оставить комментарий</h5>
+                                                    }
+
+                                                    <div class="mb-3">
+                                                        <textarea class="form-control" id="commentmessage-input" @bind=news_comment placeholder="Текст сообщения" rows="3"></textarea>
+                                                    </div>
+
+                                                    <div class="text-end">
+                                                        <button type="button" class="btn btn-success w-sm" @onclick="sendReply">Отправить</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- end card body -->
+                </div>
+                    <!-- end card -->
+            </div>
+                <!-- end col -->
+        </div>
+        }
+        else
+        {
+            <h5><i class="bx bx-buoy bx-spin text-primary display-3"></i> Загружаю новость, ожидайте пожалуйста... </h5>
+        }
+
+    </Authorized>
+    <NotAuthorized>
+        <AuthorizationPrompt Title="Вам необходимо зарегистрироваться или войти! " />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+
+    public void make_reply(schema_news_comments news_replys)
+    {
+        reply_id = news_replys.idnews_comments;
+        isReply = true;
+        StateHasChanged();
+    }
+
+    public async Task sendReply()
+    {
+        if (news_comment == "")
+        {
+            await ToastsNotifications_ShowCustomToast_Danger("Текст комментария не может быть пустым!");
+            return;
+        }
+
+        if (isReply)
+        {
+            string connection_string = "server = 82.146.44.138;user = mysql_c;password = 512Dcfbd28#;database=evicrm";
+        
+        var contextOptions = new DbContextOptionsBuilder<Context>()
+    .UseMySql(connection_string, ServerVersion.AutoDetect(connection_string))
+    .Options;
+             using (var dbContext = new Context(contextOptions))
+        {
+       
+                    schema_news_comments new_comment = new();
+            new_comment.news_body = news_comment;
+            new_comment.news_id = Current_News.idnews;
+            new_comment.news_inreply_id = reply_id;
+            new_comment.news_msg_user_id = user_model.id;
+
+            dbContext.News_Comments_Create(new_comment);
+               
+    };
+           
+        }
+        else
+        {
+            string connection_string = "server = 82.146.44.138;user = mysql_c;password = 512Dcfbd28#;database=evicrm";
+        
+        var contextOptions = new DbContextOptionsBuilder<Context>()
+    .UseMySql(connection_string, ServerVersion.AutoDetect(connection_string))
+    .Options;
+              using (var dbContext = new Context(contextOptions))
+        {
+            schema_news_comments new_comment = new();
+            new_comment.news_body = news_comment;
+            new_comment.news_id = Current_News.idnews;
+            new_comment.news_inreply_id = -1;
+            new_comment.news_msg_user_id = user_model.id;
+
+         dbContext.News_Comments_Create(new_comment);
+               
+    }; 
+        }
+
+        if(user_model != null)
+            {
+                hubConnection.SendAsync("SendMessageDirectly", user_model.login);
+            }
+            else
+            {
+                hubConnection.SendAsync("SendMessage", "username", "message");
+            }
+
+    }
+
+}
+
+@code {
+
+    bool isReply = false;
+    int reply_id = 0;
+
+    string news_comment = "";
+
+    schema_news Current_News = new();
+
+    schema_users user_model = new();
+    List<schema_news> News = new();
+    List<schema_news_comments> News_Comments = new();
+    List<schema_users> Users = new();
+
+    string user_ { get; set; }
+    string news_id;
+    bool ready = false;
+
+    bool isAdmin = false;
+
+    schema_users getUserByID(int ID)
+    {
+        if (Users != null)
+        {
+            if (Users.Count> 0)
+            {
+                return Users.FirstOrDefault(p => p.id == ID);
+            }
+        }
+        return new schema_users();
+    }
+
+    string getLatency(DateTime dt)
+    {
+        return DateStringFormatted(dt);
+    }
+
+}
+
+@code {
+
+    //Toasts:
+
+    #region Toasts Notifications
+
+    //Toast Notifications
+    private string _toastText = $@"<strong>Toast:</strong> This is a(n) {NotificationTypes.Primary} notification";
+    private bool _toastShowIcon = true;
+    private bool _toastShowCloseButton = true;
+    private bool _toastShowCountdownProgress = true;
+    private uint _toastAutoCloseInSec = 5;
+    private uint _toastShadowEffect = 5;
+    private NotificationStyles _toastStyle;
+    private NotificationTypes _toastTypeLevel;
+
+    //Toasts
+    private async Task ToastsNotifications_ShowAllToast()
+    {
+        foreach (var item in Enum.GetValues<NotificationTypes>())
+        {
+            _toastService.ShowToast($@"<strong>Toast оповещения:</strong> Это оповещение типа {item}", item);
+        }
+    }
+
+    private Guid _lastToastId;
+
+    private async Task ToastsNotifications_ShowCustomToast(string toastText, NotificationStyles ns, NotificationTypes ntype)
+    {
+        _lastToastId = _toastService.ShowToast(new ToastSettings()
+            {
+                Content = builder => builder.AddMarkupContent(0, toastText),
+                NotificationStyle = ns,
+                Type = ntype,
+                AutoCloseInSec = _toastAutoCloseInSec,
+                ShadowEffect = _toastShadowEffect,
+                ShowCloseButton = _toastShowCloseButton,
+                ShowCloseCountdownProgress = _toastShowCountdownProgress,
+                ShowIcon = _toastShowIcon
+            });
+    }
+
+    private async Task ToastsNotifications_ShowCustomToast_Primary(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Primary);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Secondary(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Secondary);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Info(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Info);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Success(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Success);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Warning(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Warning);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Danger(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Danger);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Light(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Light);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Dark(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Dark);
+    }
+    private async Task RemoveAllToasts()
+    {
+        _toastService.ClearAll();
+    }
+    private async Task RemoveLastToasts()
+    {
+        if (_lastToastId != Guid.Empty)
+        {
+            _toastService.RemoveToast(_lastToastId);
+        }
+    }
+    #endregion
+
+    //Local Storage
+
+    #region Local Storage
+    private int _localStorageCount;
+    private IList<KeyValuePair<string, string>> _localStorageItems;
+
+    List<int> users_in_lst = new List<int>();
+    List<int> users_auth_lst = new List<int>();
+
+    private async Task InsertLocalStorageItems(string key, string val)
+    {
+        await _localStorageService.SetItemAsync(key, val);
+    }
+    private async Task RefreshLocalStorageItems()
+    {
+        _localStorageItems = new List<KeyValuePair<string, string>>();
+        await foreach (var key in _localStorageService.GetAllKeysAsync())
+        {
+            if (key is null)
+                continue;
+
+            _localStorageItems.Add(new KeyValuePair<string, string>(key, await _localStorageService.GetItemAsStringAsync(key)));
+        }
+
+    }
+    private async Task SaveCustomLocalStorageItem(string key, string val)
+    {
+        await _localStorageService.SetItemAsync(key, val);
+        await RefreshLocalStorageItems();
+    }
+    private async Task<string> GetLocalStorageItems(string key)
+    {
+        return await _localStorageService.GetItemAsStringAsync(key);
+    }
+
+    #endregion
+
+    public string getUserFullnameByID(int user_id)
+    {
+        if (Users != null)
+        {
+            if (Users.Count > 0)
+            {
+                var elem = Users.FirstOrDefault(p => p.id == user_id);
+                if (elem != null)
+                {
+                    return elem.fullname;
+                }
+            }
+        }
+        return "Анонимный пользователь";
+    }
+
+         #region ALive
+
+    private HubConnection hubConnection;
+
+
+    private void CallLoadData()   
+    { 
+        string connection_string = "server = 82.146.44.138;user = mysql_c;password = 512Dcfbd28#;database=evicrm";
+        
+        var contextOptions = new DbContextOptionsBuilder<Context>()
+    .UseMySql(connection_string, ServerVersion.AutoDetect(connection_string))
+    .Options;
+
+        using (var dbContext = new Context(contextOptions))
+        {
+       
+                     News_Comments = dbContext.News_Comments_Get(Current_News);
+               
+    };
+        Task.Run(async () =>  
+        {  
+            await LoadData();  
+        });  
+    }  
+
+    protected async Task LoadData()
+    {
+        await ToastsNotifications_ShowCustomToast_Info("Загрузила новые сведения в блогах!");
+    }  
+
+    public bool IsConnected =>  
+        hubConnection.State == HubConnectionState.Connected;  
+  
+   
+    #endregion
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            user_ = authStateProvider.GetAuthenticationStateAsync().Result.User.Identity.Name;
+
+            if (user_ != null)
+            {
+                if (await _localStorageService.GetItemAsStringAsync("news_show") == null)
+                {
+                    uriHelper.NavigateTo("/news_list", true);
+                    return;
+                }
+                else
+                {
+                    news_id = await _localStorageService.GetItemAsStringAsync("news_show");
+                }
+
+                user_model = _context.User_Get(user_);
+
+                //Проверка админки
+                if (user_model.role == "admin"
+                    || user_model.role == "owner"
+                    || user_model.role == "secretary")
+                {
+                    isAdmin = true;
+                }
+                else
+                {
+                    isAdmin = false;
+                }
+
+                //Загрузка данных
+
+                News = _context.News_Get();
+
+                if (News == null)
+                {
+                    uriHelper.NavigateTo("/news_list", true);
+                    return;
+                }
+
+                if (News.Count > 0)
+                {
+                    if (int.TryParse(news_id, out int a))
+                    {
+                        Current_News = News.FirstOrDefault(p => p.idnews == a);
+                    }
+                    else
+                    {
+                        uriHelper.NavigateTo("/news_list", true);
+                        return;
+                    }
+
+                    News_Comments = _context.News_Comments_Get(Current_News);
+                    Users = _context.Users_Get();
+                }
+                else
+                {
+                    uriHelper.NavigateTo("/news_list", true);
+                    return;
+                }
+
+                 #region ALive
+            hubConnection = new HubConnectionBuilder()
+        .WithUrl(NavigationManager.ToAbsoluteUri("/alive"))
+        .Build();
+
+            hubConnection.On<string, string>("ReceiveMessage", (user, message) =>
+            {
+                CallLoadData();
+                StateHasChanged();
+            });
+
+            hubConnection.On<string>("ReceiveMessageDirectly", (user) =>
+            {
+                if (user == user_model.login)
+                {
+                    CallLoadData();
+                    StateHasChanged();
+                }
+            });
+            await hubConnection.StartAsync();
+            #endregion
+
+             sc.Log("NewsCreate", "Пользователь '" + user_model.fullname + $" зашёл в просмотр новости",SystemCore.LogLevels.Info);
+        sc.Syslog(_env, user_model.login, "Новости", $"Пользователь зашёл в просмотр новости", SystemCore.LogLevels.Info);
+
+                ready = true;
+                StateHasChanged();
+            }
+            else
+            {
+                //syslog
+                //notify
+                return;
+            }
+        }
+    }
+
+    public string DateStringFormatted(DateTime dt)
+    {
+        string dt_string = "";
+
+        switch (dt.DayOfWeek)
+        {
+            case DayOfWeek.Monday:
+                dt_string += "пн, ";
+                break;
+
+            case DayOfWeek.Tuesday:
+                dt_string += "вт, ";
+                break;
+
+            case DayOfWeek.Wednesday:
+                dt_string += "ср, ";
+                break;
+
+            case DayOfWeek.Thursday:
+                dt_string += "чт, ";
+                break;
+
+            case DayOfWeek.Friday:
+                dt_string += "пт, ";
+                break;
+
+            case DayOfWeek.Saturday:
+                dt_string += "сб, ";
+                break;
+
+            default:
+                dt_string += "вс, ";
+                break;
+        }
+
+        dt_string += dt.ToShortDateString();
+        return dt_string;
+    }
+
+}

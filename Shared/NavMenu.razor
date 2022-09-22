@@ -1,0 +1,582 @@
+﻿@using Microsoft.AspNetCore.Identity
+@inject SignInManager<IdentityUser> SignInManager
+@inject AuthenticationStateProvider authStateProvider
+
+@inject LiveNature live_nature
+@inject Context _context
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">EviCRM.Server v1309</a>
+        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+</div>
+
+<style>
+    .nav-link > hr {
+        /*visibility: hidden;
+        color: white;
+        height: 2px;
+        margin-top: 4px;
+        margin-bottom: 0;*/
+    }
+
+    .nav-item .nav-link.active > hr {
+        visibility: visible;
+        filter: blur(1.5px);
+</style>
+
+
+<div class="" style="overflow-y:scroll; overflow-x:hidden height:100%" @onclick="ToggleNavMenu">
+    <nav class="flex-column">
+
+        <AuthorizeView>
+            <NotAuthorized>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="/login">
+                        <span class="oi oi-account-login" aria-hidden="true"></span> Вход
+                        <hr />
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="/register">
+                        <span class="oi oi-account-login" aria-hidden="true"></span> Регистрация
+                        <hr />
+                    </NavLink>
+                </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="/login_recovery">
+                        <span class="oi oi-key" aria-hidden="true"></span> Забыл пароль
+                        <hr />
+                    </NavLink>
+                </div>
+            </NotAuthorized>
+
+
+
+            <Authorized>
+                @if (ready)
+                {
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/">
+
+
+                            <span class="oi oi-home" aria-hidden="true"></span>
+                            Главная
+
+                            @if (live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_index) > 0)
+                            {
+                                <span class="badge badge-danger ms-auto">@live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_index)</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-secondary ms-auto">0</span>
+                            }
+
+                            <hr />
+
+                        </NavLink>
+                    </div>
+
+
+
+                    @if (isAdmin)
+                    {
+                        <div class="nav-item px-3">
+                            <NavLink href="#" class="nav-link" @onclick="() => ToggleNavMenu2(MenuCats.AdminMenu)">
+                                <span class="oi oi-browser" aria-hidden="true"></span> Админ меню
+
+                                @if (live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_admin) > 0)
+                                {
+                                    <span class="badge badge-danger ms-auto">@live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_admin)</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-secondary ms-auto">0</span>
+                                }
+
+                                <hr />
+                            </NavLink>
+                        </div>
+
+
+                        @if (expandSubNav_Admin)
+                        {
+                            <div class="nav-item px-5">
+                                <NavLink class="nav-link" href="admin_health">
+                                    <span class="oi oi-list-rich" aria-hidden="true"></span> Состояние
+                                </NavLink>
+                            </div>
+                            <div class="nav-item px-5">
+                                <NavLink class="nav-link" href="admin_loggin">
+                                    <span class="oi oi-list-rich" aria-hidden="true"></span> Журналы
+                                </NavLink>
+                            </div>
+                           /* <div class="nav-item px-5">
+                                <NavLink class="nav-link" href="admin_settings">
+                                    <span class="oi oi-list-rich" aria-hidden="true"></span> Настройки
+                                </NavLink>
+                            </div>
+                            <div class="nav-item px-5">
+                                <NavLink class="nav-link" href="admin_statistics">
+                                    <span class="oi oi-list-rich" aria-hidden="true"></span> Статистика
+                                </NavLink>
+                            </div>
+                            <div class="nav-item px-5">
+                                <NavLink class="nav-link" href="admin_users">
+                                    <span class="oi oi-list-rich" aria-hidden="true"></span> Пользователи
+                                </NavLink>
+                            </div>
+*/
+                        }
+                    }
+
+                    @if (isAdmin)
+                    {
+
+                        <div class="nav-item px-3">
+                            <NavLink href="#" class="nav-link" @onclick="() => ToggleNavMenu2(MenuCats.StatsMenu)">
+                                <span class="oi oi-bar-chart" aria-hidden="true"></span> Статистика
+                                <hr />
+                            </NavLink>
+                        </div>
+
+                        @if (expandSubNav_Stats)
+                        {
+
+                            <div class="nav-item px-5">
+                                <NavLink class="nav-link" href="stats_marks">
+                                    <span class="oi oi-pie-chart" aria-hidden="true"></span> Оценки
+                                    <hr />
+                                </NavLink>
+                            </div>
+                            <div class="nav-item px-5">
+                                <NavLink class="nav-link" href="stats_tasks">
+                                    <span class="oi oi-bar-chart" aria-hidden="true"></span> Задачи
+                                    <hr />
+                                </NavLink>
+                            </div>
+                            <div class="nav-item px-5">
+                                <NavLink class="nav-link" href="stats_wdtable">
+                                    <span class="oi oi-timer" aria-hidden="true"></span> Табель
+                                    <hr />
+                                </NavLink>
+                            </div>
+                            <div class="nav-item px-5">
+                                <NavLink class="nav-link" href="stats_wdchart">
+                                    <span class="oi oi-timer" aria-hidden="true"></span> Активность
+                                    <hr />
+                                </NavLink>
+                            </div>
+                        }
+                    }
+
+                    <div class="nav-item px-3">
+                        <NavLink href="" class="nav-link" @onclick="() => ToggleNavMenu2(MenuCats.TasksMenu)">
+                            <span class="oi oi-task" aria-hidden="true"></span> Задачи
+
+                            @if (live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_tasks) > 0)
+                            {
+                                <span class="badge badge-danger ms-auto">@live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_tasks)</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-secondary ms-auto">0</span>
+                            }
+
+                            <hr />
+                        </NavLink>
+                    </div>
+                    @if (expandSubNav_Tasks)
+                    {
+
+                        <div class="nav-item px-5">
+                            <NavLink class="nav-link" href="tasks_list">
+                                <span class="oi oi-task" aria-hidden="true"></span> Списком
+
+                                @if (live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_tasks) > 0)
+                                {
+                                    <span class="badge badge-danger ms-auto">@live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_tasks)</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-secondary ms-auto">0</span>
+                                }
+
+                                <hr />
+                            </NavLink>
+                        </div>
+                        <div class="nav-item px-5">
+                            <NavLink class="nav-link" href="tasks_kanban">
+                                <span class="oi oi-task" aria-hidden="true"></span> Канбан
+                                @if (live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_tasks) > 0)
+                                {
+                                    <span class="badge badge-danger ms-auto">@live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_tasks)</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-secondary ms-auto">0</span>
+                                }
+                                <hr />
+                            </NavLink>
+                        </div>
+                        <div class="nav-item px-5">
+                            <NavLink class="nav-link" href="tasks_create">
+                                <span class="oi oi-task" aria-hidden="true"></span> Создать
+                                <hr />
+                            </NavLink>
+                        </div>
+
+
+                    }
+
+                    <div class="nav-item px-3">
+                        <NavLink href="#" class="nav-link" @onclick="() => ToggleNavMenu2(MenuCats.ProjectsMenu)">
+                            <span class="oi oi-folder" aria-hidden="true"></span> Проекты
+                            @if (live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_projs) > 0)
+                            {
+                                <span class="badge badge-danger ms-auto">@live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_projs)</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-secondary ms-auto">0</span>
+                            }
+                            <hr />
+                        </NavLink>
+                    </div>
+                    @if (expandSubNav_Projects)
+                    {
+
+                        <div class="nav-item px-5">
+                            <NavLink class="nav-link" href="proj_list">
+                                <span class="oi oi-folder" aria-hidden="true"></span> Списком
+                                @if (live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_projs) > 0)
+                                {
+                                    <span class="badge badge-danger ms-auto">@live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_projs)</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-secondary ms-auto">0</span>
+                                }
+                                <hr />
+                            </NavLink>
+                        </div>
+                        <div class="nav-item px-5">
+                            <NavLink class="nav-link" href="proj_grid">
+                                <span class="oi oi-folder" aria-hidden="true"></span> Сеткой
+                                @if (live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_projs) > 0)
+                                {
+                                    <span class="badge badge-danger ms-auto">@live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_projs)</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-secondary ms-auto">0</span>
+                                }
+                                <hr />
+                            </NavLink>
+                        </div>
+                        <div class="nav-item px-5">
+                            <NavLink class="nav-link" href="proj_create">
+                                <span class="oi oi-folder" aria-hidden="true"></span> Создать
+                                <hr />
+                            </NavLink>
+                        </div>
+
+
+                    }
+
+                    <div class="nav-item px-3">
+                        <NavLink href="#" class="nav-link" @onclick="() => ToggleNavMenu2(MenuCats.UsersMenu)">
+                            <span class="oi oi-people" aria-hidden="true"></span> Пользователи
+
+                            @if (live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_users) > 0)
+                            {
+                                <span class="badge badge-danger ms-auto">@live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_users)</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-secondary ms-auto">0</span>
+                            }
+
+                            <hr />
+                        </NavLink>
+                    </div>
+
+                    @if (expandSubNav_Users)
+                    {
+                        <div class="nav-item px-5">
+                            <NavLink class="nav-link" href="users_list">
+                                <span class="oi oi-list" aria-hidden="true"></span> Списком
+                                @if (live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_users) > 0)
+                                {
+                                    <span class="badge badge-danger ms-auto">@live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_users)</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-secondary ms-auto">0</span>
+                                }
+                                <hr />
+                            </NavLink>
+                        </div>
+                        <div class="nav-item px-5">
+                            <NavLink class="nav-link" href="users_grid">
+                                <span class="oi oi-list-rich" aria-hidden="true"></span> Сеткой
+                                @if (live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_users) > 0)
+                                {
+                                    <span class="badge badge-danger ms-auto">@live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_users)</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-secondary ms-auto">0</span>
+                                }
+                                <hr />
+                            </NavLink>
+                        </div>
+                        <div class="nav-item px-5">
+                            <NavLink class="nav-link" href="users_hierarchy">
+                                <span class="oi oi-person" aria-hidden="true"></span> Отдел
+                                <hr />
+                            </NavLink>
+                        </div>
+                    }
+
+                    <div class="dropdown-divider"></div>
+
+
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/calendar">
+                            <span class="oi oi-home" aria-hidden="true"></span> Календарь
+                            @if (live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_calendar) > 0)
+                            {
+                                <span class="badge badge-danger ms-auto">@live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_calendar)</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-secondary ms-auto">0</span>
+                            }
+                            <hr />
+                        </NavLink>
+                    </div>
+
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/marks_chart">
+                            <span class="oi oi-home" aria-hidden="true"></span> Дневник
+                            @if (live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifcations_markschart) > 0)
+                            {
+                                <span class="badge badge-danger ms-auto">@live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifcations_markschart)</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-secondary ms-auto">0</span>
+                            }
+                            <hr />
+                        </NavLink>
+                    </div>
+
+                    <div class="dropdown-divider"></div>
+
+/*                     <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="/chat">
+                    <span class="oi oi-chat" aria-hidden="true"></span> Чат
+                    @if (live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_chat) > 0)
+                    {
+                    <span class="badge badge-danger ms-auto">@live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_chat)</span>
+                    }
+                    else
+                    {
+                    <span class="badge badge-secondary ms-auto">0</span>
+                    }
+                    <hr />
+                    </NavLink>
+                    </div>*/
+
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/video">
+                            <span class="oi oi-globe" aria-hidden="true"></span> Конференции
+                            @if (live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_video) > 0)
+                            {
+                                <span class="badge badge-danger ms-auto">@live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_video)</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-secondary ms-auto">0</span>
+                            }
+                            <hr />
+                        </NavLink>
+                    </div>
+
+                    /*         <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="/remote">
+                    <span class="oi oi-monitor" aria-hidden="true"></span> Рабочий стол
+                    </NavLink>
+                    </div>
+                    */
+
+/*
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/store">
+                            <span class="oi oi-folder" aria-hidden="true"></span> Хранилище
+                        </NavLink>
+                    </div>
+*/
+                    
+                   /* <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="/mail">
+                    <span class="oi oi-envelope-closed" aria-hidden="true"></span> Почта
+                     @if (live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_email) > 0)
+                                {
+                                    <span class="badge badge-danger ms-auto">@live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_email)</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-secondary ms-auto">0</span>
+                                }
+                    </NavLink>
+                    </div>*/
+
+                    <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="/news_list">
+                    <span class="oi oi-browser" aria-hidden="true"></span> Новости
+                     @if (live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_news) > 0)
+                                {
+                                    <span class="badge badge-danger ms-auto">@live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_news)</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-secondary ms-auto">0</span>
+                                }
+                    </NavLink>
+                    </div>
+
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/maps">
+                            <span class="oi oi-map" aria-hidden="true"></span> Карты
+                             @if (live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_maps) > 0)
+                                {
+                                    <span class="badge badge-danger ms-auto">@live_nature.LiveNature_GetNotifyCount(user_, LiveNature.livenature_categories.notifications_maps)</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-secondary ms-auto">0</span>
+                                }
+                        </NavLink>
+                    </div>
+                }
+            </Authorized>
+        </AuthorizeView>
+
+
+    </nav>
+</div>
+
+@code {
+
+    schema_users user_ = new schema_users();
+    bool ready = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        string cookie_user_ = authStateProvider.GetAuthenticationStateAsync().Result.User.Identity.Name;
+
+        //Получаем карточку пользователя
+
+        if (cookie_user_ != null)
+        {
+            user_ = _context.User_Get(cookie_user_);
+
+            //Проверка админки
+            if (user_.role == "admin"
+                || user_.role == "owner"
+                || user_.role == "secretary")
+            {
+                isAdmin = true;
+            }
+            else
+            {
+                isAdmin = false;
+            }
+        }
+        else
+        {
+            //syslog
+            //notify
+            return;
+        }
+        ready = true;
+        InvokeAsync(StateHasChanged);
+    }
+
+    string session_cookie_data { get; set; }
+    string session_role { get; set; }
+    bool isAdmin = false;
+    string current_user_id { get; set; }
+
+    List<string> id_dt = new List<string>();
+    List<string> users_dt = new List<string>();
+
+    enum MenuCats
+    {
+        AdminMenu,
+        ProjectsMenu,
+        TasksMenu,
+        UsersMenu,
+        StatsMenu,
+    }
+
+    private bool collapseNavMenu = true;
+
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+
+    private void ToggleNavMenu2(MenuCats mc)
+    {
+        switch (mc)
+        {
+            case MenuCats.AdminMenu:
+                expandSubNav_Admin = !expandSubNav_Admin;
+                break;
+            case MenuCats.ProjectsMenu:
+                expandSubNav_Projects = !expandSubNav_Projects;
+                break;
+            case MenuCats.TasksMenu:
+                expandSubNav_Tasks = !expandSubNav_Tasks;
+                break;
+            case MenuCats.UsersMenu:
+                expandSubNav_Users = !expandSubNav_Users;
+                break;
+            case MenuCats.StatsMenu:
+                expandSubNav_Stats = !expandSubNav_Stats;
+                break;
+        }
+    }
+
+    private bool expandSubNav_Stats = false;
+    private bool expandSubNav_Admin = false;
+    private bool expandSubNav_Projects = false;
+    private bool expandSubNav_Tasks = false;
+    private bool expandSubNav_Users = false;
+
+    }
+
+    @code{
+       protected override void OnAfterRender(bool firstRender)
+        {
+            if (firstRender)
+            {
+                new Timer(DateTimeCallback, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(1));
+            }
+        }
+
+         private void DateTimeCallback(object state)
+        {
+            InvokeAsync(() => StateHasChanged());
+        }
+
+    }

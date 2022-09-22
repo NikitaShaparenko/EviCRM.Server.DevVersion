@@ -1,0 +1,570 @@
+﻿@*<PageTitle>Создать карточку</PageTitle>*@
+
+
+@inject Context _context
+@inject IWebHostEnvironment _env
+
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+
+        .action_menu2 {
+        position: absolute;
+        right: 5px;
+        bottom: 5px;
+    }
+
+     .action_menu {
+        position: absolute;
+        right: 65px;
+        bottom: 5px;
+    }
+
+
+        .btn-circle {
+            width: 50px;
+            height: 50px;
+            border-radius: 35px;
+            text-align: center;
+            padding-left: 0;
+            padding-right: 0;
+            font-size: 16px;
+            white-space: normal; /* восстанавливаем свойству значение по умолчанию */
+        }
+    </style></head>
+
+<body>
+      <div class="row">
+        <div class="col-lg-12">
+            <div class="card">
+                <div class="card-body">
+                    @if (isEditor)
+                    {
+                         <h3 class="card-title mb-4">Редактирвоание карточки</h3>
+                    }
+                    else
+                    {
+                    <h3 class="card-title mb-4">Создать новую карточку</h3>
+                    }
+
+                     <img src="@img_src_url" style="width:100%; height:200px;" />
+
+                        <InputFile id="input1" class="form-control" OnChange="@LoadAvatar" accept=".png, .jpg, .bmp"></InputFile>
+
+                     <p></p>
+                    <div class="form-group row mb-4" style="background-color:@card_color">
+                        <div class="form-group row mb-4">
+                            <p></p>
+                            <div class="col-lg-12">
+                                <input id="card_name" name="card_name" @bind=card_name type="text" class="form-control" placeholder="Название карточки">
+                            </div>
+                        </div>
+
+                        <div class="form-group row mb-4">
+                            <div class="col-lg-12">
+                                <input id="card_description" name="card_description" @bind=card_description type="text" class="form-control" placeholder="Описание">
+                            </div>
+                        </div>
+
+                         <div class="form-group row mb-4">
+                            <div class="col-lg-12">
+                                <label><font color="white">Метка карточки : </font></label>
+                                <input type="color" id="head" name="head" class="form-control" style="height:50px; width:100%;" value="@card_color" @onchange="@(e => ColorChanger(e.Value.ToString()))"/>
+                          </div>
+                        </div>
+
+
+                        <div class="form-group row mb-4">
+                            <label class="col-form-label col-lg-10"><font color="white">Даты выполнения</font></label>
+                            <div class="col-lg-10">
+                                <label><font color="white">c :</font></label>
+                                <div class="input-daterange input-group">
+                                    <input type="date" class="form-control" @bind=dt_start placeholder="Начало выполнения" name="event_start" />
+                                </div>
+                                <p></p>
+                                <label><font color="white">по :</font></label>
+                                <div class="input-daterange input-group">
+                                    <input type="date" class="form-control" @bind=dt_end placeholder="Планируемое окончание" name="event_end" />
+                                </div>
+                            </div>
+                        </div>
+
+                       <label><font color="white">Список дел:</font></label>
+                       
+                        <div><font color="white">
+                        @if (markdown_todo_data != null)
+                        {
+                            if (markdown_todo_data.Count > 0)
+                            {
+                                    <EditForm Model="@model">
+    <HxCheckboxList TItem="SelectData"
+    AutoSort=false
+                    TValue="string"
+                    Label=""
+                    ItemTextSelector="@(item => item.Name)"
+                    ItemValueSelector="@(item => item.Id)"
+                    Data="@markdown_todo_data"
+                    @bind-Value="@model.Todo_List"/>
+</EditForm>
+
+                            }
+                            else
+                            {
+                             <p><label>(нет добавленных дел)</label></p>
+                             }
+                        }
+                        </font>
+                        </div>
+
+                        <p></p>
+                       @if (isEditingMode)
+                        {
+                             <p><font color="white"><label>Редактирование дела: @getMarkdownTodoNameByMID(editing_name)</label></font></p>
+                        }
+                        else
+                        {
+                             <p><font color="white"><label>Создание дела: </label></font></p>
+                        }
+                       
+                         <div class="form-group row mb-4">
+                            <div class="col-lg-8">
+                                <input type="text" @bind="newtodo_text" class="form-control" />
+                            </div>
+                            <div class="col-lg-2">
+                                @if (isEditingMode)
+                                {
+                                     <button type="button" class="btn btn-success btn-circle" style="width: 40px; height: 40px;" @onclick="TodoSave"><i class="mdi mdi-content-save"></i></button>
+                                }
+                                else
+                                {
+                                     <button type="button" class="btn btn-success btn-circle" style="width: 40px; height: 40px;" @onclick="TodoAdd"><i class="mdi mdi-plus"></i></button>
+                                }
+                            </div>
+                             @if (isEditingMode)
+                                {
+                             <div class="col-lg-2">
+                                <button type="button" class="btn btn-danger btn-circle" style="width: 40px; height: 40px;" @onclick="TodoRemove"><i class="mdi mdi-close"></i></button>
+                            </div>
+                                }
+                        </div>
+                    </div>
+                    <div class="action_menu">
+                        <button type="button" class="btn btn-success btn-circle" @onclick="async()=>await ActionMenu()"><i class="mdi mdi-check"></i></button>
+                    </div>
+                     <div class="action_menu2">
+                        <button type="button" class="btn btn-danger btn-circle" @onclick="ClosePage"><i class="mdi mdi-close"></i></button>
+                    </div>
+                </div>
+            </div>
+            </div>
+    </div>
+</body>
+</html>
+
+@code
+{
+    [Parameter]
+    public bool isEditor { get; set; }
+
+    [Parameter]
+    public schema_markdown_cards edit_card { get; set; }
+
+    [Parameter]
+    public int desk_id_num { get; set; }
+
+    private Model model = new Model();
+    int mid = 0;
+
+    DateTime dt_start { get; set; }
+    DateTime dt_end { get; set; }
+
+    string card_name { get; set; }
+    string card_color = "#00008B";
+    string card_description { get; set; }
+    string selectedValues_desk { get; set; }
+
+    string newtodo_text = "";
+
+    bool isEditingMode = false;
+    string editing_name = "";
+
+    IEnumerable<SelectData> select_data_desks { get; set; }
+    List<SelectData> markdown_todo_data { get; set; }
+
+    string img_src_url = "/assets/images/markdown/markdown_card_template.png";
+
+    [Parameter]
+    public schema_markdown_desks Desk { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnClosePage { get; set; }
+
+    [Parameter]
+    public int task_id { get; set; }
+
+    [Parameter]
+    public EventCallback<MarkdownCard_TwoWayDesksBindings> markdown_edit {get;set;}
+
+    [Parameter]
+    public EventCallback<MarkdownCard_TwoWayDesksBindings> markdown_card {get;set;}
+
+    [Parameter]
+    public EventCallback<schema_markdown_cards> error_markdown_card {get;set;}
+
+    List<schema_markdown_todo_list> todo_lst = new();
+
+    List<bool> todo_check_lst = new();
+    bool todo;
+
+    void ColorChanger(string color)
+    {
+        card_color = color;
+        StateHasChanged();
+    }
+
+    void ClosePage()
+    {
+        OnClosePage.InvokeAsync(desk_id_num);
+    }
+
+    public bool Card_ReadyToBeSaved(schema_markdown_cards card)
+    {
+        if (card.markdown_card_date_start > card.markdown_card_date_end)
+        {
+            return false;
+        }
+        if (card.markdown_card_name == "" || card.markdown_card_name == null)
+        {
+            return false;
+        }
+        if (card.markdown_card_description == "" || card.markdown_card_description == null)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    void TodoSave()
+    {
+        if (markdown_todo_data != null)
+        {
+            if (markdown_todo_data.Count > 0)
+            {
+                for(int i = 0;i<markdown_todo_data.Count; i++)
+                {
+                    if (markdown_todo_data[i].Id == editing_name)
+                    {
+                        markdown_todo_data[i].Name = newtodo_text;
+                    }
+                }
+            }
+        }
+        model.Todo_List.Clear();
+        isEditingMode = false;
+        newtodo_text = "";
+        editing_name = "";
+        StateHasChanged();
+    }
+
+    private async Task LoadAvatar(InputFileChangeEventArgs e)
+    {
+        string filename = "";
+        int file_num = -1;
+
+        file_num++;
+        try
+        {
+
+            filename = e.File.Name;
+            var trustedFileNameForFileStorage = Path.GetRandomFileName();
+            var path = Path.Combine(_env.ContentRootPath, "wwwroot","uploads","tasktracking","markdown", filename);
+
+            //if (System.IO.File.Exists(Path.Combine(_env.ContentRootPath,_env.EnvironmentName, "uploads/calendar", filename)) || filename.Length > 100)
+
+            if (System.IO.File.Exists(Path.Combine(_env.ContentRootPath, "wwwroot","uploads","tasktracking","markdown", filename)) || filename.Length > 100)
+            {
+                string filename_we = Path.GetFileNameWithoutExtension(e.File.Name);
+                string extension = Path.GetExtension(e.File.Name);
+                filename = getUnicalFileName(filename_we, extension);
+            }
+
+            path = Path.Combine(_env.ContentRootPath, "wwwroot","uploads","tasktracking","markdown", filename);
+
+            if (e.File.Size > maxFileSize)
+            {
+                //await ToastsNotifications_ShowCustomToast_Danger("Файл слишком большой для обложки, его нельзя загрузить!");
+            }
+            else
+            {
+                await using FileStream fs = new(path, FileMode.Create);
+                await e.File.OpenReadStream(maxFileSize).CopyToAsync(fs);
+                img_src_url = "/uploads/tasktracking/markdown/" + filename;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("File: {Filename} Error: {Error}",
+                e.File.Name, ex.Message);
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+
+
+    }
+
+    string getUnicalFileName(string filename_we, string extension)
+    {
+        string guid_str = Guid.NewGuid().ToString();
+        return (filename_we + "_" + Path.GetRandomFileName() + extension);
+    }
+
+    private int maxAllowedFiles = 100;
+    private long maxFileSize = 1024 * 15 * 1024;
+
+    void TodoRemove()
+    {
+        if (markdown_todo_data != null)
+        {
+            if (markdown_todo_data.Count > 0)
+            {
+                for(int i = 0;i<markdown_todo_data.Count; i++)
+                {
+                    if (markdown_todo_data[i].Id == editing_name)
+                    {
+                        markdown_todo_data.RemoveAt(i);
+                    }
+                }
+            }
+        }
+        model.Todo_List.Clear();
+        isEditingMode = false;
+        newtodo_text = "";
+        editing_name = "";
+        StateHasChanged();
+    }
+
+
+    public string DateStringFormatted(DateTime dt)
+    {
+        string dt_string = "";
+
+        switch (dt.DayOfWeek)
+        {
+            case DayOfWeek.Monday:
+                dt_string += "пн, ";
+                break;
+
+            case DayOfWeek.Tuesday:
+                dt_string += "вт, ";
+                break;
+
+            case DayOfWeek.Wednesday:
+                dt_string += "ср, ";
+                break;
+
+            case DayOfWeek.Thursday:
+                dt_string += "чт, ";
+                break;
+
+            case DayOfWeek.Friday:
+                dt_string += "пт, ";
+                break;
+
+            case DayOfWeek.Saturday:
+                dt_string += "сб, ";
+                break;
+
+            default:
+                dt_string += "вс, ";
+                break;
+        }
+
+        dt_string += dt.ToShortDateString();
+        return dt_string;
+    }
+
+    public class SelectData
+    {
+        public string Id { get; set; }
+
+        public string Name { get; set; }
+    }
+
+
+    public string getMarkdownTodoNameByMID(string mid)
+    {
+        if (markdown_todo_data != null)
+        {
+            if (markdown_todo_data.Count > 0)
+            {
+                foreach(var elem in markdown_todo_data)
+                {
+                    if (elem.Id == mid)
+                    {
+                        return elem.Name;
+                    }
+                }
+            }
+        }
+        return "";
+    }
+
+    public void TodoAdd()
+    {
+        if (newtodo_text != "")
+        {
+            SelectData sd = new();
+            sd.Id = mid.ToString();
+            sd.Name = newtodo_text;
+            markdown_todo_data.Add(sd);
+            mid++;
+        }
+        // markdown_todo_data = markdown_todo_data.OrderBy(p => p.Id).ToList();
+        newtodo_text = "";
+        StateHasChanged();
+    }
+
+    public async Task ActionMenu()
+    {
+        schema_markdown_cards card  = new();
+
+        card.markdown_card_name = card_name;
+        card.markdown_card_description  = card_description;
+        card.markdown_card_backcolor = card_color;
+        card.markdown_card_date_end = dt_end;
+        card.markdown_card_date_start = dt_start;
+        card.markdown_card_deskid = Desk.idmarkdown_desks;
+        card.markdown_card_img_path = img_src_url;
+        card.markdown_card_taskid = task_id;
+
+        if (Card_ReadyToBeSaved(card))
+        {
+
+            MarkdownCard_TwoWayDesksBindings mc_twdb = new();
+            mc_twdb.Card = card;
+            mc_twdb.desk_num = desk_id_num;
+            mc_twdb.Todos = new();
+
+            if (markdown_todo_data != null)
+            {
+                if (markdown_todo_data.Count > 0)
+                {
+                    foreach(var elem in markdown_todo_data)
+                    {
+                        schema_markdown_todo_list scmtl = new();
+                        scmtl.markdown_todo_checked = false;
+                        scmtl.markdown_todo_name = elem.Name;
+                        scmtl.markdown_todo_taskid = task_id;
+                        mc_twdb.Todos.Add(scmtl);
+                    }
+                }
+            }
+
+            if (!isEditor)
+            {
+                await markdown_card.InvokeAsync(mc_twdb);
+            }
+            else
+            {
+                await markdown_edit.InvokeAsync(mc_twdb);
+            }
+
+
+        }
+        else
+        {
+            await error_markdown_card.InvokeAsync(card);
+        }
+    }
+
+    public bool isCardOk(schema_markdown_cards card)
+    {
+        if (card.markdown_card_name == null || card.markdown_card_name == "") return false;
+        if (card.markdown_card_description == null || card.markdown_card_description == "") return false;
+        if (card.markdown_card_date_end < card.markdown_card_date_start) return false;
+        return true;
+    }
+
+
+    protected override void OnInitialized()
+    {
+        dt_start = DateTime.Now;
+        dt_end = DateTime.Now;
+
+        new Timer(DateTimeCallback, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+
+        markdown_todo_data = new();
+        model.Todo_List = new();
+
+        if (isEditor)
+        {
+            var todos = _context.markdown_todo_list.Where(p=>p.markdown_todo_cardid == edit_card.idmarkdown_cards).ToList();
+            if (todos != null)
+            {
+                if (todos.Count > 0)
+                {
+                    markdown_todo_data = new();
+                    foreach(var elem in todos)
+                    {
+                        SelectData sd = new();
+                        sd.Id = elem.idmarkdown_todo_list.ToString();
+                        sd.Name = elem.markdown_todo_name;
+                        markdown_todo_data.Add(sd);
+                    }
+                }
+            }
+
+
+            //Редактирование карты
+            card_name = edit_card.markdown_card_name;
+            card_description= edit_card.markdown_card_description;
+     card_color = edit_card.markdown_card_backcolor;
+    dt_end = edit_card.markdown_card_date_end;
+    dt_start = edit_card.markdown_card_date_start;
+    Desk.idmarkdown_desks = edit_card.markdown_card_deskid;
+     img_src_url = edit_card.markdown_card_img_path;
+  task_id = edit_card.markdown_card_taskid;
+        }
+
+        StateHasChanged();
+    }
+
+    private void DateTimeCallback(object state)
+    {
+        Thread.Sleep(10);
+
+        bool has_checked = false;
+
+        if (model.Todo_List != null)
+        {
+            if(model.Todo_List.Count > 1)
+            {
+                string last_choiced = model.Todo_List[model.Todo_List.Count - 1];
+                model.Todo_List.Clear();
+                model.Todo_List.Add(last_choiced);
+            }
+            if (model.Todo_List.Count == 1)
+            {
+                isEditingMode = true;
+                editing_name = model.Todo_List[0];
+            }
+            else
+            {
+                isEditingMode = false;
+                editing_name = "";
+            }
+        }
+
+            InvokeAsync(StateHasChanged);
+        }
+
+     private class Model
+    {
+        public List<string> Todo_List { get; set; }
+    }
+}

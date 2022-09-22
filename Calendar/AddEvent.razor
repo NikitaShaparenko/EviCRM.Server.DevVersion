@@ -1,0 +1,203 @@
+@inject NavigationManager NavigationManager
+@inject IToastService _toastService
+@inject Context _context
+
+@using EviCRM.Server.Pages.Calendar
+@using Microsoft.AspNetCore.SignalR.Client
+
+@using BlazorCalendar.Models
+<div class="ms-depth-16 card">
+    <EditForm Model="model" OnValidSubmit="AddEventSelectedDay">
+        <div class="calendar-toolbar">
+            <button class="toolbar-button" type="submit"><i class="ms-Icon ms-Icon--AddEvent"></i></button>
+        </div>
+        <div class="card-content">
+            <h3 class="ms-fontSize-24 ms-fontWeight-regular">@SelectedDay.Date.ToString("D")</h3>
+
+            <EviCRM.Server.Pages.Calendar.CalendarTasksEmbedded 
+            
+            @ref="@embedded"
+
+            schedule_model=@model
+           
+            event_act=@operationType
+            
+            isAdmin=@isAdmin
+
+            OnSelectDay=@SelectedDay
+
+            OnCreate=@OnTaskModal_Created
+            OnDelete=@OnTaskModal_Removed
+            OnUpdate=@OnTaskModal_Updated
+            ToastErrorShow=@ToastHub
+            operationType=@operationType
+            />
+        </div>
+    </EditForm>
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+       
+    }
+
+    CalendarTasksEmbedded embedded;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            new Timer(DateTimeCallback, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        }
+    }
+
+    public CalendarDay BackupSelectedDay;
+
+    private void DateTimeCallback(object state)
+    {
+        DateTime time = embedded.WhatIsDay();
+
+        if (SelectedDay.Date != time)
+        {
+            embedded.RefreshDate(SelectedDay);
+        }
+
+        Thread.Sleep(10);
+
+    }
+
+   
+
+    string operationType = "CREATE";
+
+    [Parameter]
+    public CalendarDay SelectedDay { get; set; }
+
+    private CalendarEvent model = new CalendarEvent();
+
+    schema_calendar_schedules scheduler = new();
+
+    private void AddEventSelectedDay(){
+        SelectedDay.Events.Add(new CalendarEvent() {
+            Subject = model.Subject,
+            StartDate =  new DateTime(SelectedDay.Date.Year, SelectedDay.Date.Month, SelectedDay.Date.Day, model.StartDate.Hour, model.StartDate.Minute, 0),
+            EndDate = new DateTime(SelectedDay.Date.Year, SelectedDay.Date.Month, SelectedDay.Date.Day, model.EndDate.Hour, model.EndDate.Minute, 0)
+        });
+
+       OnEventAdded();
+    }
+    public static event Action OnEventAdded = () => {};
+}
+
+@code{
+    public void ProcessedEvent(CalendarEvent ce)
+    {
+        model = ce;
+        AddEventSelectedDay();
+    }
+
+    public void EditEvent(CalendarEvent ce)
+    {
+            embedded.Edit(ce);
+    }
+
+    public void ToastHub(string text)
+    {
+        ToToastsShow.InvokeAsync(text);
+    }
+
+    [Parameter]
+    public EventCallback<string> ToToastsShow { get; set; }
+
+}
+
+@code{
+
+    private HubConnection hubConnection;
+
+    protected async Task LoadData()
+    {
+        //await ToastsNotifications_ShowCustomToast_Info("Загрузила новые сведения в картах!");
+    }  
+
+    public bool IsConnected =>  
+        hubConnection.State == HubConnectionState.Connected;  
+
+
+
+
+
+    [Parameter]
+    public bool isAdmin { get; set; }
+
+    public void OnTaskModal_Created(schema_calendar_schedules scs)
+    {
+        string connection_string = "server = 82.146.44.138;user = mysql_c;password = 512Dcfbd28#;database=evicrm";
+
+        var contextOptions = new DbContextOptionsBuilder<Context>()
+    .UseMySql(connection_string, ServerVersion.AutoDetect(connection_string))
+    .Options;
+
+        using (var dbContext = new Context(contextOptions))
+        {
+            dbContext.CalendarSchedule_Create(scs);
+        }
+        Task.Run(async () =>  
+       {  
+           await LoadData();  
+       });
+
+
+        CalendarEvent ce = new()
+            {
+                scsh = scs,
+                StartDate = scs.startDate,
+                EndDate = scs.endDate,
+                Subject = scs.title,
+            };
+
+        model = ce;
+        AddEventSelectedDay();
+
+      
+    }
+
+     public void OnTaskModal_Updated(schema_calendar_schedules scs)
+    {
+       string connection_string = "server = 82.146.44.138;user = mysql_c;password = 512Dcfbd28#;database=evicrm";
+
+        var contextOptions = new DbContextOptionsBuilder<Context>()
+    .UseMySql(connection_string, ServerVersion.AutoDetect(connection_string))
+    .Options;
+
+        using (var dbContext = new Context(contextOptions))
+        {
+            dbContext.CalendarSchedule_Update(scs);
+        }
+         Task.Run(async () =>  
+        {  
+            await LoadData();  
+        });  
+    }
+    
+     public void OnTaskModal_Removed(int schema_id)
+    {
+       string connection_string = "server = 82.146.44.138;user = mysql_c;password = 512Dcfbd28#;database=evicrm";
+
+        var contextOptions = new DbContextOptionsBuilder<Context>()
+    .UseMySql(connection_string, ServerVersion.AutoDetect(connection_string))
+    .Options;
+
+        using (var dbContext = new Context(contextOptions))
+        {
+            dbContext.CalendarSchedule_Remove(schema_id);
+        }
+         Task.Run(async () =>  
+        {  
+            await LoadData();  
+        });  
+    }
+
+
+}

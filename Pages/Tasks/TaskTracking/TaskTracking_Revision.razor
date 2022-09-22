@@ -1,0 +1,200 @@
+﻿@using Blazorise
+@using Blazorise.RichTextEdit
+@inject Context _context
+@inject BackendController bc
+<div class="modal fade show" id="myModal" style="display:block; background-color: rgba(10,10,10,.8);" aria-modal="true" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">Отправить задачу на доработку</h4>
+                <button type="button" class="close" @onclick="@ModalCancel">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group row mb-4">
+                    <label>Вы собираетесь вернуть задачу на доработку</label>
+
+                    <label for="ttm_cmd_revision_body"><b>Что нужно исправить?</b></label>
+                          <RichTextEdit @ref="rtfRevision"
+                                                      Theme="RichTextEditTheme.Snow"
+                                                      ContentChanged="@OnContentChanged_rtfRevision"
+                                                      PlaceHolder="Введите текст изменений"
+                                                      ReadOnly=false
+                                                      SubmitOnEnter="false"
+                                                      EnterPressed="@OnSave_rtfRevision"
+                                                      ToolbarPosition="Placement.Top">
+                                                <Editor></Editor>
+                                                <Toolbar>
+                                                    <RichTextEditToolbarGroup>
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.Bold" />
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.Italic" />
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.Align" />
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.Blockquote" />
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.Header" />
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.Strike" />
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.Underline" />
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.Align" />
+
+                                                        <RichTextEditToolbarSelect Action="RichTextEditAction.Size">
+                                                            <RichTextEditToolbarSelectItem Value="small" />
+                                                            <RichTextEditToolbarSelectItem Selected />
+                                                            <RichTextEditToolbarSelectItem Value="large" />
+                                                            <RichTextEditToolbarSelectItem Value="huge">Very Big</RichTextEditToolbarSelectItem>
+                                                        </RichTextEditToolbarSelect>
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.List" Value="ordered" />
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.List" Value="bullet" />
+                                                    </RichTextEditToolbarGroup>
+                                                    <!-- Custom toolbar content -->
+                                                <RichTextEditToolbarGroup Float="Float.End">
+                                                        <!-- <Button onClick="window.open('https://www.quilljs.com/','quilljs')"><Icon Name="IconName.InfoCircle" /></Button> -->
+                                                    <Button Clicked="@OnSave_rtfRevision"><Icon Name="IconName.Save" /></Button>
+                                                    </RichTextEditToolbarGroup>
+                                                </Toolbar>
+                                            </RichTextEdit>
+                    </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-info" @onclick=@ModalOk>Вернуть на доработку</button>
+                <button type="button" class="btn" @onclick="@ModalCancel">Отмена</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code{
+    [Parameter]
+    public schema_tasks Current_Task { get; set; }
+
+     [Parameter]
+    public List<schema_users> Users { get; set; }
+
+    [Parameter]
+    public List<schema_divisions> Divisions { get; set; }
+
+
+       public string getUsernameByLogin(string login)
+    {
+        string fullname = "";
+
+        var elem = Users.FirstOrDefault(p => p.login == login);
+
+        if (elem != null)
+        {
+            fullname = elem.fullname;
+        }
+        return fullname;
+    }
+}
+
+@code{
+
+     [Parameter]
+    public EventCallback<string> OnTaskStatusUpdate { get; set; }
+
+    [Parameter]
+    public List<schema_divisions> SelectedDivisions {get;set;}
+
+    [Parameter]
+    public List<schema_users> SelectedUsers {get;set;}
+
+     [Parameter]
+    public string task_id { get; set; }
+
+    [Parameter]
+    public string task_author { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnClose { get; set; }
+
+    [Parameter]
+    public DateTime task_started { get; set;}
+
+    [Parameter]
+    public DateTime task_ended { get; set; }
+
+}
+
+@code {
+
+    RichTextEdit rtfRevision;
+
+    protected string contentAsHtml_rtfRevision;
+    protected string contentAsDeltaJson_rtfRevision;
+    protected string contentAsText_rtfRevision;
+    protected string savedContent_rtfRevision;
+
+    public async Task OnContentChanged_rtfRevision()
+    {
+        contentAsHtml_rtfRevision = await rtfRevision.GetHtmlAsync();
+        contentAsDeltaJson_rtfRevision = await rtfRevision.GetDeltaAsync();
+        contentAsText_rtfRevision= await rtfRevision.GetTextAsync();
+    }
+
+    public async Task OnSave_rtfRevision()
+    {
+        savedContent_rtfRevision = await rtfRevision.GetHtmlAsync();
+        await rtfRevision.ClearAsync();
+    }
+
+    private Task ModalCancel()
+    {
+        return OnClose.InvokeAsync(false);
+    }
+
+    private async Task ModalOk()
+    {
+        await SendTOScriptCmd();
+        await OnClose.InvokeAsync(true);
+    }
+
+    public async Task SendTOScriptCmd()
+    {
+        EviCRM.Server.ViewModels.TaskTrackingModelRevision ttmr = new EviCRM.Server.ViewModels.TaskTrackingModelRevision();
+
+        ttmr.task_author = task_author;
+        ttmr.task_id = task_id;
+        ttmr.ttm_cmd_revision_body = contentAsHtml_rtfRevision;
+
+         string TOSCRIPT_CMD = "REVISION";
+
+        string task_author_to =  ttmr.task_author;
+        string task_id_to = ttmr.task_id;
+
+        string TOSCRIPT_VAR1 = ttmr.ttm_cmd_revision_body;
+        string TOSCRIPT_VAR2 = "";
+
+        schema_task_tracking_main sttm = new()
+            {
+                task_variable1 = TOSCRIPT_VAR1,
+                task_variable2 = TOSCRIPT_VAR2,
+                task_variable3 = "",
+                task_author = task_author_to,
+                task_id = task_id_to,
+                task_cmd = TOSCRIPT_CMD,
+                task_datetime = DateTime.Now,
+            };
+
+            _context.TaskTrackingMain_Create(sttm);
+            
+
+        if (task_started < DateTime.Now && DateTime.Now < task_ended)
+        {
+            await OnTaskStatusUpdate.InvokeAsync("pending");
+        }
+        else if (task_started>DateTime.Now)
+        {
+            await OnTaskStatusUpdate.InvokeAsync("approved");
+        }
+        else
+        {
+           await OnTaskStatusUpdate.InvokeAsync("delayed");
+        }
+        
+         string push_msg = "[Задача - " +  Current_Task.task_name + "] \n";
+        push_msg += "(Пользователь: " + getUsernameByLogin(task_author_to) + ") \n \n";
+        push_msg += "Задача отправлена на доработку!: \n";
+
+        await  bc.SendTelegramMessage(push_msg,Current_Task,Users,Divisions);
+
+        await OnClose.InvokeAsync(false);
+    }
+}

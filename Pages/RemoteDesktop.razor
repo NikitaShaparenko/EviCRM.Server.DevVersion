@@ -1,0 +1,35 @@
+﻿@using WebWindows.Blazor;
+
+@page "/remote"
+
+<style>body {
+    margin: 0;            /* Reset default margin */
+}
+iframe {
+    display: block;       /* iframes are inline by default */
+    background: #000;
+    border: none;         /* Reset default border */
+    height: 100vh;        /* Viewport-relative units */
+    width: 100vw;
+}
+</style>
+
+<PageTitle>Рабочий стол</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+
+<iframe  src="https://78.140.233.179:7443/RDWeb/webclient/" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+
+    </Authorized>
+
+    <NotAuthorized>
+        <AuthorizationPrompt Title="Вам необходимо зарегистрироваться или войти! " />
+    </NotAuthorized>
+
+</AuthorizeView>
+
+@code{
+    
+   
+}

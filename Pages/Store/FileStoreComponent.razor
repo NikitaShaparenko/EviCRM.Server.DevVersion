@@ -1,0 +1,480 @@
+﻿@inject IWebHostEnvironment _env
+@inject IHttpClientFactory ClientFactory
+@inject IJSRuntime JSRuntime
+
+@inject ILocalStorageService _localStorageService
+@inject ISessionStorageService _sessionStorageService
+
+@inject NavigationManager uriHelper;
+@inject AuthenticationStateProvider authStateProvider
+
+@inject SystemCore sc;
+@inject Context _context;
+@inject BackendController bc;
+@inject Sentinel sentinel
+
+@if (ready)
+{
+    <body data-sidebar="dark">
+
+        <div class="row">
+            <div class="col-lg-@lg_num">
+                <div>
+                    <div class="card">
+                        <div class="card-body">
+                            <div>
+                                <div>
+                                    <h5 class="font-size-16 me-3">Мои файлы</h5>
+                                </div>
+
+                                <hr class="mt-2">
+
+                                <div class="table-responsive">
+                                    <table class="table align-middle table-wrap table-hover mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th scope="col" style="width:15px">#</th>
+                                                <th scope="col">Имя</th>
+                                                <th scope="col">Дата изменения</th>
+                                                <th scope="col" style="width:100px">Размер</th>
+                                                <th scope="col" style="width:120px">Действия</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+
+                                            <tr>
+                                                <td><i class="bx bx-up-arrow" /></td>
+                                                <td colspan="4"> <a href="javascript: void(0);" @onclick="MoveUp" class="text-dark fw-medium"> ( Вверх )</a></td>
+                                            </tr>
+
+                                            @if (store_collection != null)
+                                            {
+                                                if (store_collection.Count > 0)
+                                                {
+                                                    @foreach (var elem in store_collection)
+                                                    {
+                                                        @if (file_mode)
+                                                        {
+                                                            @if (elem.isFile)
+                                                            {
+                                                                <tr>
+                                                                    <td><i class="@elem.icon_tag font-size-16 align-middle text-warning me-2"></i></td>
+                                                                    <td><a href="javascript: void(0);" @onclick="async()=>await FileDownload_Alexandra(elem.name)" class="text-dark fw-medium">@System.IO.Path.GetFileName(elem.name)</a></td>
+                                                                    <td>@elem.date_modifed.ToShortDateString() , @elem.date_modifed.ToShortTimeString()</td>
+                                                                    <td>@FormatSize(elem.file_size)</td>
+                                                                    <td>
+                                                                        <a href="javascript: void(0);" @onclick="async()=>await FileDownload_Alexandra(elem.name)" class="btn btn-outline-primary"><i class="bx bx-download"></i></a>
+                                                                        <a href="javascript: void(0);" @onclick="()=>FileRemove_Alexandra(elem.name)" class="btn btn-outline-danger"><i class="bx bx-x"></i></a>
+                                                                    </td>
+                                                                </tr>
+                                                            }
+                                                            else
+                                                            {
+                                                                <tr>
+                                                                    <td><i class="@elem.icon_tag font-size-16 align-middle text-warning me-2"></i></td>
+                                                                    <td><a href="javascript: void(0);" @onclick="()=>DirectorySelect_Alexandra(elem.name)" class="text-dark fw-medium">@getDirectoryName(elem.name)</a></td>
+                                                                    <td>@elem.date_modifed.ToShortDateString() , @elem.date_modifed.ToShortTimeString()</td>
+                                                                    <td>( папка )</td>
+                                                                    <td>
+                                                                    </td>
+                                                                </tr>
+                                                            }
+                                                        }
+                                                        else
+                                                        {
+                                                            @if (elem.isFile)
+                                                            {
+                                                                <tr>
+                                                                    <td><i class="@elem.icon_tag font-size-16 align-middle text-warning me-2"></i></td>
+                                                                    <td><a href="javascript: void(0);" @onclick="()=>FileDownload_Exchange(elem.name)" class="text-dark fw-medium">@System.IO.Path.GetFileName(elem.name)</a></td>
+                                                                    <td>@elem.date_modifed.ToShortDateString() , @elem.date_modifed.ToShortTimeString()</td>
+                                                                    <td>@FormatSize(elem.file_size)</td>
+                                                                    <td>
+                                                                        <a href="javascript: void(0);" @onclick="()=>FileDownload_Exchange(elem.name)" class="btn btn-outline-primary"><i class="bx bx-download"></i></a>
+                                                                        <a href="javascript: void(0);" @onclick="()=>FileRemove_Exchange(elem.name)" class="btn btn-outline-danger"><i class="bx bx-x"></i></a>
+                                                                    </td>
+                                                                </tr>
+                                                            }
+                                                            else
+                                                            {
+                                                                <tr>
+                                                                    <td><i class="@elem.icon_tag font-size-16 align-middle text-warning me-2"></i></td>
+                                                                    <td><a href="javascript: void(0);" @onclick="()=>SelectDir_Exchange(elem.name)" class="text-dark fw-medium">@getDirectoryName(elem.name)</a></td>
+                                                                    <td>@elem.date_modifed.ToShortDateString() , @elem.date_modifed.ToShortTimeString()</td>
+                                                                    <td>( папка )</td>
+                                                                    <td>
+                                                                    </td>
+                                                                </tr>
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            @if (!IsEmbedded)
+            {
+                <div class="col-lg-3">
+                    <div class="card-body">
+                        <div class="text-center">
+                            <h5 class="font-size-15 mb-4">Хранилище</h5>
+                            <p class="text-muted mt-4">Выбери источник и необходимый файл</p>
+                        </div>
+
+                        <div class="mt-4">
+                            <div class="card border shadow-none mb-2">
+                                <a href="javascript: void(0);" @onclick="@(()=>setFileMode(true))" class="text-body">
+
+                                    @if (file_mode)
+                                    {
+                                        <div class="p-2" style="background-color:#4c93ff">
+                                            <div class="d-flex">
+                                                <div class="avatar-xs align-self-center me-2 p-1">
+                                                    <div class="avatar-title rounded bg-transparent text-success font-size-20">
+                                                        <i class="mdi mdi-server"> </i>
+                                                    </div>
+                                                </div>
+                                                <div class="center p-1">
+                                                    <h5 class="font-size-13 text-truncate mb-1 text-center"><font color="white">Файлы от Александры</font></h5>
+                                                    @*<p class="text-muted text-truncate mb-0"><font color="white">0 файлов</font></p>*@
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="p-2">
+                                            <div class="d-flex">
+                                                <div class="avatar-xs align-self-center me-2 p-1">
+                                                    <div class="avatar-title rounded bg-transparent text-success font-size-20">
+                                                        <i class="mdi mdi-server"> </i>
+                                                    </div>
+                                                </div>
+                                                <div class="center p-1">
+                                                    <h5 class="font-size-13 text-truncate mb-1 text-center">Файлы от Александры</h5>
+                                                    @*<p class="text-muted text-truncate mb-0"><font color="white">0 файлов</font></p>*@
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                    <div class="p-2">
+                                        <div class="d-flex">
+                                            <div class="avatar-xs align-self-center me-2 p-1">
+                                                <div class="avatar-title rounded bg-transparent text-success font-size-20">
+                                                    <i class="mdi mdi-cloud-upload"> </i>
+                                                </div>
+                                            </div>
+                                            <div class="center p-1">
+                                                <h5 class="font-size-13 text-truncate mb-1 text-center">Загрузить в хранилище</h5>
+                                                <p class="text-muted text-truncate mb-0"><InputFile OnChange="@LoadFilesAttachments" multiple class="form-control" /></p>
+
+                                                @if (file_fileName != "")
+                                                {
+                                                    <p></p>
+                                                    <p><b><i class="bx bx-buoy bx-spin text-primary display-3"></i> Файл загружается на сервер, пожалуйста ожидайте... </b></p>
+
+                                                    @file_fileName
+                                                    <p>
+                                                        <progress value="@file_UploadedBytes" max="@file_Size"></progress>
+                                                        @(" ") @file_UploadedPercentage.ToString("F1") @("% ")
+                                                        @FormatBytes(file_UploadedBytes) @(" / ") @FormatBytes(file_Size);
+                                                    </p>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+
+
+
+
+                            <div class="card border shadow-none mb-2">
+                                <a href="javascript: void(0);" @onclick="@(()=>setFileMode(false))" class="text-body">
+                                    @if (!file_mode)
+                                    {
+                                        <div class="p-2" style="background-color:#4c93ff">
+                                            <div class="d-flex">
+                                                <div class="avatar-xs align-self-center me-2 p-1">
+                                                    <div class="avatar-title rounded bg-transparent text-success font-size-20">
+                                                        <i class="mdi mdi-server-network"> </i>
+                                                    </div>
+                                                </div>
+
+                                                <div class="center p-1">
+                                                    <h5 class="font-size-13 text-truncate mb-1 text-center"><font color="white">Файлы на сервере</font></h5>
+                                                    @*<p class="text-muted text-truncate mb-0">0 файлов</p>*@
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="p-2">
+                                            <div class="d-flex">
+                                                <div class="avatar-xs align-self-center me-2 p-1">
+                                                    <div class="avatar-title rounded bg-transparent text-success font-size-20">
+                                                        <i class="mdi mdi-server-network"> </i>
+                                                    </div>
+                                                </div>
+
+                                                <div class="center p-1">
+                                                    <h5 class="font-size-13 text-truncate mb-1 text-center">Файлы на сервере</h5>
+                                                    @*<p class="text-muted text-truncate mb-0">0 файлов</p>*@
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </a>
+                            </div>
+
+
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </body>
+}
+else
+{
+    <h5><i class="bx bx-buoy bx-spin text-primary display-3"></i> Загружаю файловый менеджер, ожидайте пожалуйста... </h5>
+}
+
+@code{
+
+    #region Local Storage
+     private int _localStorageCount;
+    private IList<KeyValuePair<string, string>> _localStorageItems;
+
+    private async Task InsertLocalStorageItems(string key, string val)
+    {
+        await _localStorageService.SetItemAsync(key, val);
+    }
+    private async Task<string> GetLocalStorageItems(string key)
+    {
+        return await _localStorageService.GetItemAsStringAsync(key);
+    }
+    private async Task RefreshLocalStorageItems()
+    {
+        _localStorageItems = new List<KeyValuePair<string, string>>();
+        await foreach (var key in _localStorageService.GetAllKeysAsync())
+        {
+            if (key is null)
+                continue;
+
+            _localStorageItems.Add(new KeyValuePair<string, string>(key, await _localStorageService.GetItemAsStringAsync(key)));
+        }
+    }
+    private async Task SaveCustomLocalStorageItem(string key, string val)
+    {
+        await _localStorageService.SetItemAsync(key, val);
+        await RefreshLocalStorageItems();
+    }
+
+    #endregion
+
+}
+
+@code {
+    string root_path = "";
+
+    [Parameter] public bool IsEmbedded { get; set; }
+    [Parameter] public EventCallback<string> SelectedPath { get; set; }
+
+    int lg_num = 9;
+    bool file_mode = true;
+    bool ready = false;
+
+    string user_ { get; set;}
+    schema_users _user { get; set; }
+    bool isAdmin = false;
+
+    protected override Task OnInitializedAsync()
+    {
+        if (IsEmbedded == true)
+        {
+            file_mode = true;
+            lg_num = 12;
+        }
+
+        user_ = authStateProvider.GetAuthenticationStateAsync().Result.User.Identity.Name;
+
+        //Получаем карточку пользователя
+
+        if (user_ != null)
+        {
+            _user = _context.User_Get(user_);
+
+            //Проверка админки
+            if (_user.role == "admin" 
+                || _user.role=="owner"
+                || _user.role =="secretary")
+            {
+                isAdmin = true;
+            }
+            else
+            {
+                isAdmin = false;
+            }
+
+            //Загрузка данных
+
+        }
+        else
+        {
+            //syslog
+            //notify
+        }
+
+        file_fileName = "";
+        file_UploadedPercentage = 0;
+        file_Size = 0;
+        file_UploadedBytes = 0;
+
+        root_path = "";
+        ready = true;
+
+        return InvokeAsync(StateHasChanged);
+    }
+
+    public void setFileMode(bool file_mode_)
+    {
+        file_mode = file_mode_;
+        root_path = "";
+
+        MoveTo();
+
+        StateHasChanged();
+    }
+
+}
+
+@code
+{
+    List<FileSystemEntityModel> store_collection = new List<FileSystemEntityModel>();
+
+    public void MoveTo()
+    {
+        if (file_mode)
+        {
+            if (root_path != null)
+            {
+                store_collection = FileSystemManager_Alexandra(root_path);
+            }
+            else
+            {
+                store_collection = FileSystemManager_Alexandra();
+            }
+        }
+        else
+        {
+            if (root_path != null)
+            {
+                store_collection = FileSystemManager_Exchange(root_path);
+            }
+            else
+            {
+                store_collection = FileSystemManager_Exchange();
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    public void MoveUp()
+    {
+        if (file_mode)
+        {
+            root_path = FileSystemManagerUp_Alexandra(root_path);
+        }
+        else
+        {
+            root_path = FileSystemManagerUp_Exchange(root_path);
+        }
+        MoveTo();
+        StateHasChanged();
+
+    }
+
+    public void FileRemove_Alexandra(string path)
+    {
+        if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
+        StateHasChanged();
+    }
+
+    public void FileRemove_Exchange(string path)
+    {
+        FileSystemManagerKiller_Exchange(path);
+        StateHasChanged();
+    }
+
+
+    public void DirectorySelect_Alexandra(string dir_name)
+    {
+        root_path = dir_name;
+        StateHasChanged();
+    }
+
+    public async Task FileDownload_Alexandra(string filename)
+    {
+        if (IsEmbedded)
+        {
+            await SelectedPath.InvokeAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+        else
+        {
+            if (root_path == null) root_path = "";
+            var fileName = Path.GetExtension(filename);
+            var fileURL = Alexandra_FileDownloader(filename); 
+            await DownloadFileFromStream(Path.Combine(root_path,filename));
+        }
+    }
+
+    private Stream GetFileStream()
+{
+    string txt = "test";
+    byte[] data = Convert.FromBase64String(txt);
+    var fileStream = new MemoryStream(data);
+
+    return fileStream;
+}
+
+
+     private async Task DownloadFileFromStream(string fileName)
+    {
+        var fileStream = GetFileStream();
+        
+        using var streamRef = new DotNetStreamReference(stream: fileStream);
+
+        await JSRuntime.InvokeVoidAsync("downloadFileFromStream", fileName, streamRef);
+    }
+
+    public async Task FileDownload_Exchange(string filename)
+    {
+        string file_path_lcl = FileSystemManagerDownload_Exchange(filename);
+        await FileDownload_Alexandra(file_path_lcl);
+
+    }
+
+    public void SelectDir_Exchange(string path)
+    {
+        store_collection = FileSystemManager_Exchange(path);
+        root_path = path;
+        StateHasChanged();
+    }
+
+
+}

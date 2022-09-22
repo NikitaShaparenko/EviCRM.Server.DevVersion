@@ -1,0 +1,807 @@
+﻿@page "/news_create"
+@using EviCRM.Server.Pages.Secretary
+@using Microsoft.AspNetCore.SignalR.Client
+
+@inject IWebHostEnvironment _env;
+@inject IToastService _toastService;
+@inject ILocalStorageService _localStorageService
+
+@inject AuthenticationStateProvider authStateProvider
+@inject NavigationManager uriHelper;
+
+@inject NavigationManager NavigationManager 
+@inject BackendController bc;
+@inject Context _context;
+@inject Sentinel sentinel;
+@inject SystemCore sc;
+
+<style>
+
+    .wordwrap {
+        word-wrap: break-word; /* Перенос слов */
+    }
+
+    .container {
+        border: 1px solid #000000;
+        height: 300px;
+    }
+
+        .container textarea {
+            border: 1px solid red;
+            height: 100%;
+        }
+
+    /* Important part */
+    .modal-dialog {
+        overflow-y: initial !important
+    }
+
+    .modal-body {
+        max-height: calc(100vh - 200px);
+        overflow-y: auto;
+    }
+</style>
+
+<h5>Новости \ Создание</h5>
+<PageTitle>Создание новости</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+
+        @if (!ready)
+        {
+            <p><i class="bx bx-buoy bx-spin text-primary display-3"></i><i> Пожалуйста подождите пока загружается страница. Это не займёт много времени</i></p>
+        }
+        else
+        {
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <h3 class="card-title mb-4">Новая новость</h3>
+
+                            <div data-repeater-list="outer-group" class="outer">
+                                <div data-repeater-item class="outer">
+                                    <div class="form-group row mb-4">
+                                        <label for="taskname" class="col-form-label col-lg-2">Заголовок новости</label>
+                                        <div class="col-lg-10">
+                                            <input id="taskname" name="task_name" @bind=New_News.news_head type="text" class="form-control" placeholder="Введите заголовок новости">
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group row mb-4">
+                                        <label for="taskname" class="col-form-label col-lg-2">Краткое описание новости</label>
+                                        <div class="col-lg-10">
+                                            <input id="taskname" name="task_name" @bind=New_News.news_title type="text" class="form-control" placeholder="Введите описание новости">
+                                        </div>
+                                    </div>
+
+                                      <div class="row mb-4">
+                    <label class="col-form-label col-lg-2">Заглавное изображение новости</label>
+                    <div class="col-lg-10">
+                        <InputFile id="input1" class="form-control" OnChange="@LoadAvatar" accept=".png, .jpg, .bmp"></InputFile>
+                     </div>
+                </div>
+
+                                    <div class="form-group row mb-4">
+                                        <label class="col-form-label col-lg-2">Текст новости</label>
+                                        <div class="col-lg-10">
+
+                                            <RichTextEdit @ref="rtfNews"
+                                                      Theme="RichTextEditTheme.Snow"
+                                                      ContentChanged="@OnContentChanged_newsDescription"
+                                                      PlaceHolder="Введите текст изменений"
+                                                      ReadOnly="false"
+                                                      SubmitOnEnter="false"
+                                                      EnterPressed="@OnSave_newsDescription"
+                                                      ToolbarPosition="Placement.Top">
+                                                <Editor></Editor>
+                                                <Toolbar>
+                                                    <RichTextEditToolbarGroup>
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.Bold" />
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.Italic" />
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.Align" />
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.Blockquote" />
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.Header" />
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.Strike" />
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.Underline" />
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.Align" />
+
+                                                        <RichTextEditToolbarSelect Action="RichTextEditAction.Size">
+                                                            <RichTextEditToolbarSelectItem Value="small" />
+                                                            <RichTextEditToolbarSelectItem Selected />
+                                                            <RichTextEditToolbarSelectItem Value="large" />
+                                                            <RichTextEditToolbarSelectItem Value="huge">Very Big</RichTextEditToolbarSelectItem>
+                                                        </RichTextEditToolbarSelect>
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.List" Value="ordered" />
+                                                        <RichTextEditToolbarButton Action="RichTextEditAction.List" Value="bullet" />
+                                                    </RichTextEditToolbarGroup>
+                                                <RichTextEditToolbarGroup Float="Float.End">
+                                                        <Button Clicked="@OnSave_newsDescription"><Icon Name="IconName.Save" /></Button>
+                                                    </RichTextEditToolbarGroup>
+                                                </Toolbar>
+                                            </RichTextEdit>
+
+                                        </div>
+                                    </div>
+
+                                     <div class="form-group row mb-4">
+
+                                        <label for="select_tags" class="col-form-label col-lg-2">Теги новости</label>
+                                        <div class="col-lg-10">
+
+                                            <Havit.Blazor.Components.Web.Bootstrap.HxMultiSelect Label="Список тегов"
+                                                                                             TItem="@SelectData"
+                                                                                             TValue="string"
+                                                                                             Data="@select_data_tags"
+                                                                                             @bind-Value="@SelectedValues_tags"
+                                                                                             TextSelector="@((p) => p.Name)"
+                                                                                             ValueSelector="@((p) => p.Id)"
+                                                                                             EmptyText="Выберите одно или несколько значений"
+                                                                                             NullDataText="Загружаются значения..." />
+
+                                        </div>
+                                    </div>
+
+                                     <div class="form-group row mb-4">
+                                        <label for="select_users" class="col-form-label col-lg-2">Отметить участников</label>
+                                        <div class="col-lg-10">
+
+                                            <Havit.Blazor.Components.Web.Bootstrap.HxMultiSelect Label="Список пользователей"
+                                                                                             TItem="@SelectData"
+                                                                                             TValue="string"
+                                                                                             Data="@select_data_users"
+                                                                                             @bind-Value="@SelectedValues_users"
+                                                                                             TextSelector="@((p) => p.Name)"
+                                                                                             ValueSelector="@((p) => p.Id)"
+                                                                                             EmptyText="Выберите одно или несколько значений"
+                                                                                             NullDataText="Загружаются значения..." />
+
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group row mb-4">
+                                        <label for="select_divs" class="col-form-label col-lg-2">Отметить отделы</label>
+                                        <div class="col-lg-10">
+
+                                            <Havit.Blazor.Components.Web.Bootstrap.HxMultiSelect Label="Список отделов"
+                                                                                             TItem="@SelectData"
+                                                                                             TValue="string"
+                                                                                             Data="@select_data_divisions"
+                                                                                             @bind-Value="@SelectedValues_divisions"
+                                                                                             TextSelector="@((p) => p.Name)"
+                                                                                             ValueSelector="@((p) => p.Id)"
+                                                                                             EmptyText="Выберите одно или несколько значений"
+                                                                                             NullDataText="Загружаются значения..." />
+
+                                        </div>
+                                    </div>
+
+                                                     <div class="form-group row mb-4">
+                                        <label for="select_cat" class="col-form-label col-lg-2">Категория новости</label>
+                                        <div class="col-lg-10">
+
+                                            <Havit.Blazor.Components.Web.Bootstrap.HxSelect Label="Список тегов"
+                                                                                             TItem="string"
+                                                                                             TValue="string"
+                                                                                             Data="@select_data_cats"
+                                                                                             @bind-Value="@SelectedValues_cats"
+                                                                                             TextSelector="@((p) => p)"
+                                                                                             ValueSelector="@((p) => p)"
+                                                                                             NullDataText="Загружаются значения..." />
+
+                                        </div>
+                                    </div>
+                                   
+                                    <div class="row justify-content-end">
+                                        <div class="col-lg-10">
+                                            <button type="button" onclick=@(()=>Create()) class="btn btn-primary">Создать новость</button>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        }
+    </Authorized>
+    <NotAuthorized>
+        <AuthorizationPrompt Title="Вам необходимо зарегистрироваться или войти! " />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code{
+    schema_news New_News = new();
+    List<schema_news> News = new();
+    List<schema_users> Users = new();
+    schema_users user_model = new();
+    List<schema_divisions> Divisions = new();
+    List<schema_news_tags> News_Tags = new();
+    List<schema_news_cats> News_Cats = new();
+
+    bool ready = false;
+    string user_ { get; set; }
+    bool isAdmin = false;
+
+    RichTextEdit rtfNews;
+    private IList<SelectData> select_data_tags;
+    private IList<SelectData> select_data_users;
+    private IList<SelectData> select_data_divisions;
+    private List<string> select_data_cats;
+
+    #region Selecting Variables
+
+    List<string> SelectedValues_tags { get; set; }
+    List<string> SelectedValues_users { get; set; }
+    List<string> SelectedValues_divisions { get; set; }
+    string SelectedValues_cats { get; set; }
+
+    protected string contentAsHtml_newsDescription;
+    protected string contentAsDeltaJson_newsDescription;
+    protected string contentAsText_newsDescription;
+    protected string savedContent_newsDescription;
+
+    public async Task OnContentChanged_newsDescription()
+    {
+        contentAsHtml_newsDescription = await rtfNews.GetHtmlAsync();
+        contentAsDeltaJson_newsDescription = await rtfNews.GetDeltaAsync();
+        contentAsText_newsDescription = await rtfNews.GetTextAsync();
+    }
+
+    public async Task OnSave_newsDescription()
+    {
+        savedContent_newsDescription = await rtfNews.GetHtmlAsync();
+        await rtfNews.ClearAsync();
+    }
+
+    #endregion
+
+     #region ALive
+
+    private HubConnection hubConnection;
+
+
+    private void CallLoadData()   
+    { 
+        string connection_string = "server = 82.146.44.138;user = mysql_c;password = 512Dcfbd28#;database=evicrm";
+        
+        var contextOptions = new DbContextOptionsBuilder<Context>()
+    .UseMySql(connection_string, ServerVersion.AutoDetect(connection_string))
+    .Options;
+
+        using (var dbContext = new Context(contextOptions))
+        {
+       
+                    News = dbContext.News_Get();
+                    News_Tags = dbContext.News_Tags_Get();
+            News_Cats = dbContext.News_Cats_Get();
+               
+    };
+        Task.Run(async () =>  
+        {  
+            await LoadData();  
+        });  
+    }  
+
+    protected async Task LoadData()
+    {
+        await ToastsNotifications_ShowCustomToast_Info("Загрузила новые сведения в блогах!");
+    }  
+
+    public bool IsConnected =>  
+        hubConnection.State == HubConnectionState.Connected;  
+  
+   
+    #endregion
+
+    protected override async Task OnInitializedAsync()
+    {
+        ready = false;
+
+        user_ = authStateProvider.GetAuthenticationStateAsync().Result.User.Identity.Name;
+
+        user_model = new schema_users();
+
+        if (user_ != null)
+        {
+            user_model = _context.User_Get(user_);
+
+            //Проверка админки
+            if (user_model.role == "admin"
+                || user_model.role == "owner"
+                || user_model.role == "secretary")
+            {
+                isAdmin = true;
+            }
+            else
+            {
+                isAdmin = false;
+            }
+
+            //Загрузка данных
+
+            News = _context.News_Get();
+            Users = _context.Users_Get();
+            Divisions = _context.Divisions_Get();
+            News_Tags = _context.News_Tags_Get();
+            News_Cats = _context.News_Cats_Get();
+        }
+        else
+        {
+            //syslog
+            //notify
+            return;
+        }
+
+        select_data_divisions = new List<SelectData>();
+        select_data_users = new List<SelectData>();
+        select_data_tags = new List<SelectData>();
+
+        if (Divisions != null)
+        {
+            if (Divisions.Count > 0)
+            {
+                foreach(var elem in Divisions)
+                {
+                    SelectData sd = new SelectData();
+                    sd.Id = elem.id.ToString();
+                    sd.Name = elem.division_name;
+                    select_data_divisions.Add(sd);
+                }
+            }
+            else
+            {
+                SelectData sd = new SelectData();
+                sd.Id = "$null";
+                sd.Name = "Нет отделов для добавления";
+                select_data_divisions.Add(sd);
+            }
+        }
+
+
+        if (Users != null)
+        {
+            if (Users.Count > 0)
+            {
+                foreach (var elem in Users)
+                {
+                    SelectData sd = new SelectData();
+                    sd.Id = elem.id.ToString();
+                    sd.Name = elem.fullname;
+                    select_data_users.Add(sd);
+                }
+            }
+            else
+            {
+                SelectData sd = new SelectData();
+                sd.Id = "$null";
+                sd.Name = "Нет пользователей для добавления";
+                select_data_users.Add(sd);
+            }
+
+        }
+
+
+        if (News_Tags != null)
+        {
+            if (News_Tags.Count > 0)
+            {
+                foreach (var elem in News_Tags)
+                {
+                    SelectData sd = new SelectData();
+                    sd.Id = elem.idnews_tags.ToString();
+                    sd.Name = elem.news_tags_body;
+                    select_data_tags.Add(sd);
+                }  
+            }
+            else
+            {
+                SelectData sd = new SelectData();
+                sd.Id = "$null";
+                sd.Name = "Нет тегов для выбора";
+                select_data_tags.Add(sd);
+            }
+
+
+        } 
+
+        if (News_Cats != null)
+        {
+            if (News_Cats.Count > 0)
+            {
+                select_data_cats = new List<string>();
+                foreach (var elem in News_Cats)
+                {
+                    select_data_cats.Add(elem.news_cats_body);
+                }
+            }
+            else
+            {
+                select_data_cats = new List<string>();
+                select_data_cats.Add("Нет категорий для выбора");
+            }
+
+        }
+        else
+        {
+            select_data_cats = new List<string>();
+            select_data_cats.Add("Нет категорий для выбора");
+        }
+
+        #region ALive
+            hubConnection = new HubConnectionBuilder()
+        .WithUrl(NavigationManager.ToAbsoluteUri("/alive"))
+        .Build();
+
+            hubConnection.On<string, string>("ReceiveMessage", (user, message) =>
+            {
+                CallLoadData();
+                StateHasChanged();
+            });
+
+            hubConnection.On<string>("ReceiveMessageDirectly", (user) =>
+            {
+                if (user == user_model.login)
+                {
+                    CallLoadData();
+                    StateHasChanged();
+                }
+            });
+            await hubConnection.StartAsync();
+            #endregion
+
+
+             sc.Log("NewsCreate", "Пользователь '" + user_model.fullname + $" зашёл в новости",SystemCore.LogLevels.Info);
+        sc.Syslog(_env, user_model.login, "Новости", $"Пользователь {New_News.news_head} зашёл в новости", SystemCore.LogLevels.Info);
+        ready = true;
+        await InvokeAsync(StateHasChanged);
+    }
+    }
+
+    @code{
+    public async Task Create()
+    {
+        if (New_News.news_head == "" || New_News.news_head ==  null)
+        {
+            await ToastsNotifications_ShowCustomToast_Danger("У новости не может быть пустой заголовок!");
+            return;
+        }
+
+        if (New_News.news_title == "" || New_News.news_title == null)
+        {
+            await ToastsNotifications_ShowCustomToast_Danger("У новости не может быть пустое краткое описание!");
+            return;
+        }
+
+        if (contentAsText_newsDescription == "" || contentAsText_newsDescription  == null || contentAsText_newsDescription == "\n")
+        {
+            await ToastsNotifications_ShowCustomToast_Danger("Новость не может быть без текста!");
+            return;
+        }
+        else
+        {
+            New_News.news_body = bc.Base64Encode(contentAsHtml_newsDescription);
+        }
+
+        if (SelectedValues_tags != null)
+        {
+            if (SelectedValues_tags.Count > 0)
+            {
+                if (SelectedValues_tags.Count == 1 && SelectedValues_tags[0] == "$null")
+                {
+                    New_News.news_tags = "$null";
+                }
+                else
+                {
+                    New_News.news_tags = bc.getMultipleStringEncodingString(SelectedValues_tags);
+                }
+            }
+            else
+            {
+                New_News.news_tags = "$null";
+            }
+        }
+        else
+        {
+            New_News.news_tags = "$null";
+        }
+
+        if (SelectedValues_divisions != null)
+        {
+            if (SelectedValues_divisions.Count > 0)
+            {
+                if (SelectedValues_divisions.Count == 1 && SelectedValues_divisions[0] == "$null")
+                {
+                    New_News.news_mention_divs = "$null";
+                }
+                else
+                {
+                    New_News.news_mention_divs = bc.getMultipleStringEncodingString(SelectedValues_divisions);
+                }
+            }
+            else
+            {
+                New_News.news_mention_divs = "$null";
+            }
+        }
+        else
+        {
+            New_News.news_mention_divs = "$null";
+        }
+
+        if (SelectedValues_users != null)
+        {
+            if (SelectedValues_users.Count > 0)
+            {
+                if (SelectedValues_users.Count == 1 && SelectedValues_users[0] == "$null")
+                {
+                    New_News.news_mention_users = "$null";
+                }
+                else
+                {
+                    New_News.news_mention_users = bc.getMultipleStringEncodingString(SelectedValues_users);
+                }
+            }
+            else
+            {
+                New_News.news_mention_users = "$null";
+            }
+        }
+        else
+        {
+            New_News.news_mention_users = "$null";
+        }
+
+
+        if (SelectedValues_cats != null && SelectedValues_cats != "")
+        {
+            New_News.news_category = SelectedValues_cats;
+        }
+
+        else
+        {
+            New_News.news_category = "$null";
+        }
+
+        if (avatar_path == "")
+        {
+            New_News.news_title_img = "/uploads/news/stock.png";
+        }
+        else
+        {
+            New_News.news_title_img = "/uploads/news/" + avatar_path;
+        }
+
+        New_News.news_author = user_model.id;
+
+
+
+        string connection_string = "server = 82.146.44.138;user = mysql_c;password = 512Dcfbd28#;database=evicrm";
+
+        var contextOptions = new DbContextOptionsBuilder<Context>()
+    .UseMySql(connection_string, ServerVersion.AutoDetect(connection_string))
+    .Options;
+
+        using (var dbContext = new Context(contextOptions))
+        {
+
+            _context.News_Create(New_News);
+
+        };
+
+        if(user_model != null)
+        {
+            hubConnection.SendAsync("SendMessageDirectly", user_model.login);
+        }
+        else
+        {
+            hubConnection.SendAsync("SendMessage", "username", "message");
+        }
+
+        sc.Log("NewsCreate", "Пользователь '" + user_model.fullname + $" успешно создал новость {New_News.news_head}",SystemCore.LogLevels.Info);
+        sc.Syslog(_env, user_model.login, "Новости", $"Создана новость: {New_News.news_head}", SystemCore.LogLevels.Info);
+
+        await Task.Delay(500);
+        await ToastsNotifications_ShowCustomToast_Info("Новость успешно создана!");
+        await InvokeAsync(StateHasChanged);
+        rtfNews.DisposeAsync();
+        uriHelper.NavigateTo("/news_list",true);
+    }
+
+    string SupressSpaces(string filename)
+    {
+        if (filename.Contains(" "))
+        {
+            filename = filename.Replace(" ","_");
+        }
+        return filename;
+    }
+    }
+
+    @code{
+
+    private long maxFileSize = 1024 * 15 * 1024;
+    string avatar_path = "";
+
+    private async Task LoadAvatar(InputFileChangeEventArgs e)
+    {
+        string filename = "";
+        int file_num = -1;
+
+        file_num++;
+        try
+        {
+
+            filename = e.File.Name;
+            filename=SupressSpaces(filename);
+            var trustedFileNameForFileStorage = Path.GetRandomFileName();
+            var path = Path.Combine(_env.ContentRootPath, "wwwroot","uploads","news", filename);
+
+            if (System.IO.File.Exists(Path.Combine(_env.ContentRootPath, "wwwroot","uploads","news", filename)) || filename.Length > 100)
+            {
+                string filename_we = Path.GetFileNameWithoutExtension(e.File.Name);
+                string extension = Path.GetExtension(e.File.Name);
+                filename = getUnicalFileName(filename_we, extension);
+            }
+
+            path = Path.Combine(_env.ContentRootPath, "wwwroot", "uploads", "news", filename);
+
+                if (e.File.Size > maxFileSize)
+                {
+                    await ToastsNotifications_ShowCustomToast_Danger("Файл слишком большой для картинки, его невозможно загрузить!");
+                }
+                else
+                {
+                    await using FileStream fs = new(path, FileMode.Create);
+                    await e.File.OpenReadStream(maxFileSize).CopyToAsync(fs);
+                    avatar_path = filename;
+                }
+            }
+            catch (Exception ex)
+            {
+                sc.Log("NewsCreate", "Ошибка при загрузке файла '" + filename + "', " + ex.Message, SystemCore.LogLevels.Error);
+                     sc.Syslog(_env, user_model.login, "Новости", $"Произошла ошибка при загрузке файла: {filename}", SystemCore.LogLevels.Info);
+            }
+            finally
+            {
+                
+                 sc.Log("NewsCreate", "Загружен файл '" + filename + "'", SystemCore.LogLevels.Info);
+                sc.Syslog(_env, user_model.login, "Новости // Создание", $"Загрузил файл к оценке: {filename}", SystemCore.LogLevels.Info);
+                StateHasChanged();
+            }
+        }
+
+         string getUnicalFileName(string filename_we, string extension)
+        {
+            string guid_str = Guid.NewGuid().ToString();
+            return (filename_we + "_" + Path.GetRandomFileName() + extension);
+        }
+    }
+
+    @code{
+        //Toasts:
+
+        #region Toasts Notifications //Toasts & Notification
+
+        //Toast Notifications
+        private string _toastText = $@"<strong>Toast:</strong> This is a(n) {NotificationTypes.Primary} notification";
+    private bool _toastShowIcon = true;
+    private bool _toastShowCloseButton = true;
+    private bool _toastShowCountdownProgress = true;
+    private uint _toastAutoCloseInSec = 5;
+    private uint _toastShadowEffect = 5;
+    private NotificationStyles _toastStyle;
+    private NotificationTypes _toastTypeLevel;
+
+    //Toasts
+    private async Task ToastsNotifications_ShowAllToast()
+    {
+        foreach (var item in Enum.GetValues<NotificationTypes>())
+        {
+            _toastService.ShowToast($@"<strong>Toast оповещения:</strong> Это оповещение типа {item}", item);
+        }
+    }
+
+    private Guid _lastToastId;
+
+    private async Task ToastsNotifications_ShowCustomToast(string toastText, NotificationStyles ns, NotificationTypes ntype)
+    {
+        _lastToastId = _toastService.ShowToast(new ToastSettings()
+            {
+                Content = builder => builder.AddMarkupContent(0, toastText),
+                NotificationStyle = ns,
+                Type = ntype,
+                AutoCloseInSec = _toastAutoCloseInSec,
+                ShadowEffect = _toastShadowEffect,
+                ShowCloseButton = _toastShowCloseButton,
+                ShowCloseCountdownProgress = _toastShowCountdownProgress,
+                ShowIcon = _toastShowIcon
+            });
+    }
+
+    private async Task ToastsNotifications_ShowCustomToast_Primary(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Primary);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Secondary(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Secondary);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Info(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Info);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Success(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Success);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Warning(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Warning);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Danger(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Danger);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Light(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Light);
+    }
+    private async Task ToastsNotifications_ShowCustomToast_Dark(string toastText)
+    {
+        await ToastsNotifications_ShowCustomToast(toastText, NotificationStyles.Normal, NotificationTypes.Dark);
+    }
+    private async Task RemoveAllToasts()
+    {
+        _toastService.ClearAll();
+    }
+    private async Task RemoveLastToasts()
+    {
+        if (_lastToastId != Guid.Empty)
+        {
+            _toastService.RemoveToast(_lastToastId);
+        }
+    }
+    #endregion
+
+    //Local Storage
+
+    #region Local Storage
+    private int _localStorageCount;
+    private IList<KeyValuePair<string, string>> _localStorageItems;
+
+    List<int> users_in_lst = new List<int>();
+    List<int> users_auth_lst = new List<int>();
+
+    private async Task InsertLocalStorageItems(string key, string val)
+    {
+        await _localStorageService.SetItemAsync(key, val);
+    }
+    private async Task RefreshLocalStorageItems()
+    {
+        _localStorageItems = new List<KeyValuePair<string, string>>();
+        await foreach (var key in _localStorageService.GetAllKeysAsync())
+        {
+            if (key is null)
+                continue;
+
+            _localStorageItems.Add(new KeyValuePair<string, string>(key, await _localStorageService.GetItemAsStringAsync(key)));
+        }
+
+    }
+    private async Task SaveCustomLocalStorageItem(string key, string val)
+    {
+        await _localStorageService.SetItemAsync(key, val);
+        await RefreshLocalStorageItems();
+    }
+    private async Task<string> GetLocalStorageItems(string key)
+    {
+        return await _localStorageService.GetItemAsStringAsync(key);
+    }
+
+    #endregion
+
+} 

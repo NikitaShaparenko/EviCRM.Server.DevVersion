@@ -1,0 +1,197 @@
+﻿@using EviCRM.Server.Models;
+
+@inject Context _context;
+@inject BackendController bc;
+
+<div class="modal fade show" id="myModal" style="display:block; background-color: rgba(10,10,10,.8);" aria-modal="true" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">Изменить даты задачи</h4>
+                <button type="button" class="close" @onclick="@ModalCancel">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group row mb-4">
+                             <p>Выберите новые даты для текущей задачи:</p>
+                               <div class="col-lg-10">
+                                        <b>Дата начала: </b><input type="date" class="form-control" @bind=dt_start placeholder="Начало выполнения" name="event_start" />
+                                        <p><b>Дата окончания: </b><input type="date" class="form-control" @bind=dt_end placeholder="Планируемое окончание" name="event_end" /></p>
+                     </div>
+                              <div>
+                            </div>
+                    </div>
+                
+            </div>
+            <div class="modal-footer">
+                        <button type="button" class="btn" @onclick="@ModalCancel">Закрыть</button>
+                        <button type="button" class="btn btn-primary" @onclick="@(() => ModalOk())">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code{
+    [Parameter]
+    public schema_tasks Current_Task { get; set; }
+
+     [Parameter]
+    public List<schema_users> Users { get; set; }
+
+    [Parameter]
+    public List<schema_divisions> Divisions { get; set; }
+
+}
+
+
+@code {
+    DateTime dt_end { get; set; }
+    DateTime dt_start { get; set; }
+
+    [Parameter]
+    public string task_author { get; set; }
+
+    [Parameter]
+    public DateTime modal_dt_start { get; set; }
+
+    [Parameter]
+    public string task_id { get; set; }
+
+    [Parameter]
+    public DateTime modal_dt_end { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnTaskStatusUpdate { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnClose { get; set; }
+
+
+    private async Task ModalCancel()
+    {
+        await OnClose.InvokeAsync(true);
+    }
+
+      public string getUsernameByLogin(string login)
+    {
+        string fullname = "";
+
+        var elem = Users.FirstOrDefault(p => p.login == login);
+
+        if (elem != null)
+        {
+            fullname = elem.fullname;
+        }
+        return fullname;
+    }
+
+    private async Task ModalOk()
+    {
+        if (dt_end > dt_start)
+        {
+
+            if (dt_start < DateTime.Now && DateTime.Now < dt_end)
+            {
+                await OnTaskStatusUpdate.InvokeAsync("pending");
+            }
+            else if (dt_start>DateTime.Now)
+            {
+                await OnTaskStatusUpdate.InvokeAsync("approved");
+            }
+            else
+            {
+                await OnTaskStatusUpdate.InvokeAsync("delayed");
+            }
+
+
+
+            if (dt_start != modal_dt_start)
+            {
+                ViewModels.TaskTrackingModelChangeDates ttmcd = new  ViewModels.TaskTrackingModelChangeDates();
+
+                ttmcd.date = dt_start;
+                ttmcd.task_author = task_author;
+                ttmcd.task_id = task_id;
+
+               string TOSCRIPT_CMD = "CHANGESTARTDATE";
+
+        string task_author_to =  ttmcd.task_author;
+        string task_id_to = ttmcd.task_id;
+
+        string TOSCRIPT_VAR1 = ttmcd.date.ToShortDateString();
+        string TOSCRIPT_VAR2 = "";
+
+        schema_task_tracking_main sttm = new()
+            {
+                task_variable1 = TOSCRIPT_VAR1,
+                task_variable2 = TOSCRIPT_VAR2,
+                task_variable3 = "",
+                task_author = task_author_to,
+                task_id = task_id_to,
+                task_cmd = TOSCRIPT_CMD,
+                task_datetime = DateTime.Now,
+            };
+
+       _context.TaskTrackingMain_Create(sttm);
+
+        string push_msg = "[Задача - " +  Current_Task.task_name + "] \n";
+        push_msg += "(Пользователь: " + getUsernameByLogin(task_author_to) + ") \n \n";
+        push_msg += "Изменил дату начала выполнения на " + TOSCRIPT_VAR1 + " \n";
+
+        await  bc.SendTelegramMessage(push_msg,Current_Task,Users,Divisions);
+                await OnClose.InvokeAsync(true);
+            }
+
+            if (dt_end != modal_dt_end)
+            {
+                ViewModels.TaskTrackingModelChangeDates ttmcd = new  ViewModels.TaskTrackingModelChangeDates();
+
+                ttmcd.date = dt_end;
+                ttmcd.task_author = task_author;
+                ttmcd.task_id = task_id;
+
+                string TOSCRIPT_CMD = "CHANGEDEADLINE";
+
+                string task_author_to =  ttmcd.task_author;
+                string task_id_to = ttmcd.task_id;
+
+                string TOSCRIPT_VAR1 = ttmcd.date.ToShortDateString();
+                string TOSCRIPT_VAR2 = "";
+
+                schema_task_tracking_main sttm = new()
+            {
+                task_variable1 = TOSCRIPT_VAR1,
+                task_variable2 = TOSCRIPT_VAR2,
+                task_variable3 = "",
+                task_author = task_author,
+                task_id = task_id,
+                task_cmd = TOSCRIPT_CMD,
+                task_datetime = DateTime.Now,
+            };
+
+                _context.TaskTrackingMain_Create(sttm);
+
+        string push_msg = "[Задача - " +  Current_Task.task_name + "] \n";
+        push_msg += "(Пользователь: " + getUsernameByLogin(task_author_to) + ") \n \n";
+        push_msg += "Изменил срок окончания задачи на " + TOSCRIPT_VAR1 + " \n";
+
+        await  bc.SendTelegramMessage(push_msg,Current_Task,Users,Divisions);
+
+            }
+        }
+        else
+        {
+            dt_start = dt_end;
+        }
+        StateHasChanged();
+    }
+
+    protected override void OnInitialized()
+    {
+        dt_start =   modal_dt_start;
+        dt_end = modal_dt_end;
+        StateHasChanged();
+    }
+
+
+    
+}

@@ -1,0 +1,183 @@
+﻿@using EviCRM.Server.Core
+@using EviCRM.Server.Models
+@using EviCRM.Server.ViewModels;
+
+@inject BackendController bc
+@inject Context _context
+@inject SystemCore sc
+@inject Sentinel sentinel
+
+@if (!isAdmin)
+{
+<td>@cnt</td>
+<td>
+     <input type="text" readonly name="div_name" value="@div.division_name"/>
+</td>
+                           
+<td>
+
+<Havit.Blazor.Components.Web.Bootstrap.HxMultiSelect Label="Руководитель отдела"
+               TItem="@UserSelectionModel" 
+               TValue="string" 
+               Data="@select_data_users" 
+               @bind-Value="SelectedValues_responsible" 
+               TextSelector="@((p) => p.Name)" 
+               ValueSelector="@((p) => p.ID)" 
+               EmptyText="Выберите одно или несколько значений" 
+               NullDataText="Загружаются значения..." 
+               readonly="readonly"/>
+          
+</td>
+
+<td>
+<Havit.Blazor.Components.Web.Bootstrap.HxMultiSelect 
+               Label="Работники отдела"
+               TItem="@UserSelectionModel" 
+               TValue="string" 
+               Data="@select_data_users" 
+               @bind-Value="SelectedValues_users" 
+               TextSelector="@((p) => p.Name)" 
+               ValueSelector="@((p) => p.ID)" 
+               EmptyText="Выберите одно или несколько значений" 
+               NullDataText="Загружаются значения..." 
+               readonly="readonly" />
+                    
+
+    </td>
+}
+else
+{
+    <td style="vertical-align: middle;">@cnt</td>
+<td style="vertical-align: middle;">
+     <input type="text" name="div_name" @bind="@div.division_name"/>
+</td>
+                           
+<td>
+
+<Havit.Blazor.Components.Web.Bootstrap.HxMultiSelect 
+               Label="Руководитель отдела"
+               TItem="@UserSelectionModel"
+               TValue="string" 
+               Data="@select_data_users" 
+               @bind-Value="SelectedValues_responsible" 
+               TextSelector="@((p) => p.Name)"
+               ValueSelector="@((p) => p.ID)" 
+               EmptyText="Выберите одно или несколько значений" 
+               NullDataText="Загружаются значения..."/>
+          
+</td>
+
+<td>
+<Havit.Blazor.Components.Web.Bootstrap.HxMultiSelect 
+               Label="Работники отдела"
+               TItem="@UserSelectionModel" 
+               TValue="string" 
+               Data="@select_data_users" 
+               @bind-Value="SelectedValues_users"
+               TextSelector="@((p) => p.Name)"
+               ValueSelector="@((p) => p.ID)"
+               EmptyText="Выберите одно или несколько значений"
+               NullDataText="Загружаются значения..." />
+                    
+
+    </td>
+
+    <td style="vertical-align: middle;">
+        <button type="button" class="btn btn-success waves-effect waves-light" @onclick="(()=>SaveChanges())"><i class='bx bx-save'></i></button>
+        <button type="button" class="btn btn-danger waves-effect waves-light" @onclick="(()=>Kill())"><i class="fas fa-times ms-1"></i></button>
+    </td>
+}
+
+@code{
+    [Parameter] public bool isAdmin{ get; set; }
+
+    [Parameter] public EventCallback<schema_divisions> OnKill { get; set; }
+
+    [Parameter] public EventCallback<schema_divisions> OnSave { get; set; }
+
+    [Parameter] public schema_divisions div { get; set; }
+
+    [Parameter] public List<schema_users> users { get; set; }
+
+    [Parameter] public int cnt { get; set; }
+
+    IList<UserSelectionModel> select_data_users = new List<UserSelectionModel>();
+    IList<DivisionSelectionModel> select_data_divs = new List<DivisionSelectionModel>();
+    List<string> SelectedValues_users = new List<string>();
+    List<string> SelectedValues_responsible = new List<string>();
+
+}
+
+@code{
+
+    public void SaveChanges()
+    {
+        OnSave.InvokeAsync(div);
+
+    }
+
+    public void Kill()
+    {
+        OnKill.InvokeAsync(div);
+    }
+
+
+    public int users_dt_count { get; set; }
+
+    List<string> cast_list = new List<string>();
+    List<string> div_list = new List<string>();
+
+
+
+    protected async override Task OnInitializedAsync()
+    {
+        cast_list = bc.getMultipleStringDecodingString(div.division_cast);
+        List<int> cast_list_id = new();
+        if (users != null)
+        {
+            foreach(var elem in cast_list)
+            {
+                cast_list_id.Add(users.FirstOrDefault(p => p.login == elem).id);
+            }
+           
+        }
+
+        if (users.Count>0)
+        {
+             foreach(var elem in users)
+             {
+            UserSelectionModel usm = new UserSelectionModel();
+            usm.ID = elem.id.ToString();
+            usm.Name = elem.fullname;
+            select_data_users.Add(usm);
+             }
+        }
+       
+
+        foreach(var elem in users)
+             {
+            DivisionSelectionModel dsm = new DivisionSelectionModel();
+            dsm.ID = elem.id.ToString();
+            dsm.Name = elem.fullname;
+            select_data_divs.Add(dsm);
+        }
+
+        SelectedValues_users.Clear();
+        foreach(int str in cast_list_id)
+        {
+            SelectedValues_users.Add(str.ToString());
+        }
+
+        int responsible_id = users.FirstOrDefault(p => p.login  == div.division_responsible).id;
+        SelectedValues_responsible.Add(responsible_id.ToString());
+
+        StateHasChanged();
+
+    }
+
+}                                
+
+                               
+                              
+                           
+                            
